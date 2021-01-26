@@ -101,9 +101,13 @@ PCA_all<-gm.prcomp(minke_coords)
 #List of PC components and proportion of variation
 PCA_all 
 ##View plot
-plot(PCA_all, main = "PCA all data",  pch = 21, bg = "deeppink", font.lab = 2)
+plot(PCA_all, main = "PCA all data",  pch = 21, #title and type of point to be used
+     col = "deeppink",   #border of points
+     bg = "deeppink",    #fill of points
+     cex = 1,            #size of points (1=regular)
+     font.main = 2)       #bold font for title
 #Add quick labels to plot
-text(x=PCA_all$x[,1], y=PCA_all$x[,2], labels = rownames(PCA_all$x), 
+text(x = PCA_all$x[,1], y = PCA_all$x[,2], labels = rownames(PCA_all$x), 
      pos = 1,       #position relative to data point
      offset = 0.5,  #distance from data point
      cex = 0.75)    #font size (1=regular)
@@ -162,15 +166,53 @@ ggplot(minke_pcscores_all, aes(x = Comp1, y = Comp2, label = individuals, colour
   
 
 #ALLOMETRY CORRECTION ----
-minkeAllometry <- procD.lm(minke.shape~CSsize, iter=999, print.progress = TRUE) #Evaluate allometry and get the allometry-free shapes
-summary(minkeAllometry) #main results of ANOVA analysis of allometry
-minkeAllometry.log <- procD.lm(minke.shape~logCSsize, iter=999, print.progress = TRUE) #Evaluate allometry and get the allometry-free shapes using LogCS, use this for analyses
-summary(minkeAllometry.log) #main results of ANOVA analysis of allometry with logCS
-shape.resid <- arrayspecs(minkeAllometry.log$residuals,p=dim(minke.shape)[1], k=dim(minke.shape)[2]) #Create residuals array to then save as coordinates for analyses
-minke.shape.all <- shape.resid + array(minke.shape.mean, dim(shape.resid)) #New shapes adjusted for allometry with CS to use in analyses
+##Evaluate allometry and get the allometry-free shapes using LogCS, use this for analyses
+minkeAllometry_log <- procD.lm(minke_coords~logCsize, iter=999, print.progress = TRUE) 
+View(minkeAllometry_log)
+
+#Main results of ANOVA analysis of allometry with logCS
+summary(minkeAllometry_log) 
+
+#Create residuals array to then save as coordinates for analyses
+shape_residuals <- arrayspecs(minkeAllometry_log$residuals,p=dim(minke_coords)[1], k=dim(minke_coords)[2]) 
+
+#New shapes adjusted for allometry with CS to use in analyses
+minkeAllometry_residuals <- shape_residuals + array(mean_shape, dim(shape_residuals)) 
+View(minkeAllometry_residuals)
+
+##Plot shape vs logCS to visualize allometry
+#Regression score of shape vs logCS - regression method with regression score plotting
+allometryplot_regscore <- plot(minkeAllometry_log,type = "regression",predictor = logCsize, reg.type = "RegScore",
+                          main = "Shape vs logCS",xlab = "logCS", pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)   #improve graphics
+text(x = logCsize, y = allometryplot_regscore$RegScore, labels = minke_ind,
+     pos = 3, offset = 0.5, cex = 0.75)    #improve appearance of labels
+
+#PC1 values vs logCS - regression method with prediction line plotting
+allometryplot_regline <- plot(minkeAllometry_log,type = "regression",predictor = logCsize, reg.type = "PredLine",
+                             main = "PC1 vs logCS",xlab = "logCS", pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)
+text(x = logCsize, y = allometryplot_regline$PredLine, labels = minke_ind,
+     pos = 2, offset = 0.5, cex = 0.75)  
+
+
+allom.pls<-two.b.pls(logCSsize,minke.shape,iter = 999) #Two-block PLS of allometry, another way to visualize connection between logCS and shape, main one for analyses
+summary(allom.pls) #get P-value of regression
+plot(allom.pls,pch=19,col = as.numeric(classifiers)) #Make sure it is ok and save plot with pred line
+
+
+allom.pls.CS<-two.b.pls(CSsize,minke.shape,iter = 999) #Two-block PLS of allometry, another way to visualize connection between CS and shape
+summary(allom.pls.CS) #get P-value of regression
+plot(allom.pls.CS,pch=19,col = as.numeric(classifiers)) #Make sure it is ok and save plot with pred line
+
+
 PCAplot.all<-gm.prcomp(minke.shape.all, label = minke.ind,groups = classifiers,legend = TRUE) #New PCA plot with data corrected for allometry
+
+
 PCAplot.all #List of PC components and proportion of variations
+
+
 summary(PCAplot.all) #Vie) results
+
+
 plot(PCAplot.all) #View plot
 PC1min.all<-PCAplot.all$pc.shapes$PC1min #Save shapes of extremes for axes used in plot
 PC1max.all<-PCAplot.all$pc.shapes$PC1max #Save shapes of extremes for axes used in plot
@@ -182,16 +224,9 @@ rgl.snapshot(filename = "X.png") #save screenshot of 3D deformation plot, useful
 #Better use screen snip this fails!
 PC1min.all.plot.mesh<-plotRefToTarget(minke.shape.mean,PC1min.all,method = "surface",mesh=minke.skull3D, mag = 1, label = FALSE) #Show mesh3D that represents extreme of axis, do this for all 4 extremes
 writePLY("PC1min.all.mesh.ply") #save as PLY file
-allometryplot.logCS<-plot(minkeAllometry.log,type = "regression",predictor=logCSsize,reg.type = "RegScore",main = "Shape vs CS",xlab = "CS",pch=19,col = as.numeric(classifiers)) #Plot shape vs logCS to visualize allometry
-text(logCSsize, allometryplot.logCS$RegScore, labels = minke.ind, cex=0.5) #insert labels on points
-allometryplot.CS<-plot(minkeAllometry,type = "regression",predictor=CSsize,reg.type = "RegScore",main = "Shape vs CS",xlab = "CS",pch=19,col = as.numeric(classifiers)) #Plot shape vs CS to visualize allometry
-text(CSsize, allometryplot.CS$RegScore, labels = minke.ind, cex=0.5) #insert labels on points
-allom.pls<-two.b.pls(logCSsize,minke.shape,iter = 999) #Two-block PLS of allometry, another way to visualize connection between logCS and shape, main one for analyses
-summary(allom.pls) #get P-value of regression
-plot(allom.pls,pch=19,col = as.numeric(classifiers)) #Make sure it is ok and save plot with pred line
-allom.pls.CS<-two.b.pls(CSsize,minke.shape,iter = 999) #Two-block PLS of allometry, another way to visualize connection between CS and shape
-summary(allom.pls.CS) #get P-value of regression
-plot(allom.pls.CS,pch=19,col = as.numeric(classifiers)) #Make sure it is ok and save plot with pred line
+
+
+
 
 
 #ANOVA OF GROUP DIFFERENCES  ----
