@@ -181,17 +181,105 @@ minkeAllometry_residuals <- shape_residuals + array(mean_shape, dim(shape_residu
 View(minkeAllometry_residuals)
 
 ##Plot shape vs logCS to visualize allometry
+#Diagnostic plots to check if model is appropriate - similar to ANOVA tables
+init <- par(no.readonly=TRUE) #store initial plot parameters to restore later
+par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
+allometryplot_diagnostics <- plot(minkeAllometry_log,type = "diagnostics",
+                              cex = 1.2, font.main = 2)
+par(init)                     #restore initial plot parameters (1 plot showing at a time)
+
 #Regression score of shape vs logCS - regression method with regression score plotting
 allometryplot_regscore <- plot(minkeAllometry_log,type = "regression",predictor = logCsize, reg.type = "RegScore",
                           main = "Shape vs logCS",xlab = "logCS", pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)   #improve graphics
 text(x = logCsize, y = allometryplot_regscore$RegScore, labels = minke_ind,
      pos = 3, offset = 0.5, cex = 0.75)    #improve appearance of labels
 
+##Add regression line with confidence intervals to plot
+#Create object to use for linear model
+reg_scores <- allometryplot_regscore[["RegScore"]] 
+
+#Linear model for line
+reg_line <- (lm(reg_scores~logCsize))
+
+#Draw line on plot
+abline(reg_line, col = "darkseagreen3", 
+       lty = 2, lwd = 2)     #line type (e.g. dashed) and width
+
+#Add confidence intervals
+#Create data for confidence intervals
+x_vals <- seq(min(logCsize), max(logCsize), length = 12)   #use min and max of x values (logCS) as limits and use number of specimens as length of sequence
+newX <- expand.grid(logCsize = x_vals)                     #warp x_vals on values of x axis (logCS)
+newY <- predict(reg_line, newdata = data.frame(x = newX), interval="confidence",
+        level = 0.95)                                      #predict the y values based on the x sequence
+
+#Draw confidence intervals lines on plot
+matlines(newX, newY[,2:3],                                 #first column of newY not useful, it is the fit, 2 and 3 are the min and max values
+         col = "darkseagreen3", lty=1)                     #line graphics
+
+##Make better allometry plot with ggplot
+#Create data frame object that ggplot can read - use data from plot object you want to improve
+minkeAllometry_plot <- data.frame(logCS = allometryplot_regscore[["plot.args"]][["x"]], RegScores = allometryplot_regscore[["plot.args"]][["y"]])
+minkeAllometry_plot
+
+#Convert data frame to tibble
+minkeAllometry_plot <- as_tibble(minkeAllometry_plot)
+glimpse(minkeAllometry_plot)
+View(minkeAllometry_plot)
+#Add labels and other attributes to tibble as columns
+minkeAllometry_plot <- minkeAllometry_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(minkeAllometry_plot)
+
+#Nice plot with specimens colored by age
+ggplot(minkeAllometry_plot, aes(x = logCS, y = RegScores, label = individuals, colour = age))+
+  geom_point(size = 3)+
+  geom_text_repel(colour = "black", size = 3.5)+
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  theme_classic(base_size = 12)+
+  ylab("Regression Score")+
+  ggtitle ("Shape vs logCS")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+##Add regression line with confidence intervals
+#Make data frame of data for confidence intervals
+conf_intervals <- data.frame(newX, newY)
+conf_intervals 
+#Rename columns to match main plot tibble varibales for x and y
+conf_intervals <- rename(conf_intervals, logCS = logCsize, RegScores = fit)
+conf_intervals 
+
+#Convert data frame to tibble
+conf_intervals <- as_tibble(conf_intervals)
+glimpse(conf_intervals)
+#Add labels and other attributes to tibble as columns to match main plot tibble
+conf_intervals <- conf_intervals %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(conf_intervals)
+
+#Nice plot with regression line and confidence intervals - do not color by age or it will mess it up
+ggplot(minkeAllometry_plot, aes(x = logCS, y = RegScores, label = individuals))+
+  geom_point(size = 3, colour = "chartreuse4")+   #colour all points the same
+  theme_classic(base_size = 12)+
+  ylab("Regression Score")+
+  ggtitle ("Shape vs logCS")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))+
+  geom_smooth(data = conf_intervals, aes(ymin = lwr, ymax = upr), stat = 'identity',     #confidence intervals and reg line
+              colour = "darkseagreen3", fill = 'gainsboro')+                             #line colour and interval fill
+  geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
+                  force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance)
+
 #PC1 values vs logCS - regression method with prediction line plotting
 allometryplot_regline <- plot(minkeAllometry_log,type = "regression",predictor = logCsize, reg.type = "PredLine",
                              main = "PC1 vs logCS",xlab = "logCS", pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)
 text(x = logCsize, y = allometryplot_regline$PredLine, labels = minke_ind,
      pos = 2, offset = 0.5, cex = 0.75)  
+
+#PCA plot of fitted values - likely not very useful if size is a big component of variation, only PC1 will have weight
+allometryplot_pc <- plot(minkeAllometry_log,type = "PC",
+                         main = "PCA fitted values", pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)
+text(x = allometryplot_pc$plot.args$x, y = allometryplot_pc$plot.args$y, labels = minke_ind,
+     pos = 3, offset = 0.5, cex = 0.75) 
+
+#TWO-BLOCK PLS ----
 
 
 allom.pls<-two.b.pls(logCSsize,minke.shape,iter = 999) #Two-block PLS of allometry, another way to visualize connection between logCS and shape, main one for analyses
@@ -203,6 +291,7 @@ allom.pls.CS<-two.b.pls(CSsize,minke.shape,iter = 999) #Two-block PLS of allomet
 summary(allom.pls.CS) #get P-value of regression
 plot(allom.pls.CS,pch=19,col = as.numeric(classifiers)) #Make sure it is ok and save plot with pred line
 
+#PCA ALLOMETRY RESIDUALS ----
 
 PCAplot.all<-gm.prcomp(minke.shape.all, label = minke.ind,groups = classifiers,legend = TRUE) #New PCA plot with data corrected for allometry
 
