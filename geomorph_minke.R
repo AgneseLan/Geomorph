@@ -2,7 +2,7 @@
 library(geomorph) 
 library(geiger)
 library(dplyr)
-library(ggplot)
+library(ggplot2)
 library(tidyr)
 library(tidyverse)
 library(ggrepel)
@@ -122,17 +122,17 @@ PC2min_all <- PCA_all[["shapes"]][["shapes.comp2"]][["min"]]
 PC2max_all <- PCA_all[["shapes"]][["shapes.comp2"]][["max"]] 
 
 #Show deformation grids on axis from mean shape, do this for all 4 extremes - "TPS" method
-plotRefToTarget(mean_shape, PC1min_all, method = "TPS", mag = 1, label = FALSE)
+plotRefToTarget(mean_shape, PC1min_all, method = "TPS", mag = 1, label = FALSE)     #save image
 
 #Show 3D deformation from mean with points overlay, do this for all 4 extremes - "points" method
-plotRefToTarget(mean_shape, PC1min_all, method = "points", mag = 1, label = FALSE)
+plotRefToTarget(mean_shape, PC1min_all, method = "points", mag = 1, label = FALSE)    #save as HTML
 
 #Show 3D deformation from mean with vectors, do this for all 4 extremes - "vector" method
-plotRefToTarget(mean_shape, PC1min_all, method = "vector", mag = 1, label = FALSE)
+plotRefToTarget(mean_shape, PC1min_all, method = "vector", mag = 1, label = FALSE)    #save as screenshot
 
 #Show 3D deformation from mean by warping 3D mesh, do this for all 4 extremes - "surface" method
-plotRefToTarget(mean_shape, PC1min_all, mesh = ref_mesh, method = "surface", mag = 1, label = FALSE)
-
+plotRefToTarget(mean_shape, PC1min_all, mesh = ref_mesh, method = "surface", mag = 1, label = FALSE)   #save as HTML
+ 
 ##3D windows save
 #Save screenshot of 3D window, useful for lateral and dorsal views - use screen snip if it fails
 rgl.snapshot(filename = "Output/X.png") 
@@ -179,6 +179,9 @@ shape_residuals <- arrayspecs(minkeAllometry_log$residuals,p=dim(minke_coords)[1
 #New shapes adjusted for allometry with CS to use in analyses
 minkeAllometry_residuals <- shape_residuals + array(mean_shape, dim(shape_residuals)) 
 View(minkeAllometry_residuals)
+
+#Save mean shape of allometry-adjusted shapes to sue later
+mean_shape_res <- mshape(minkeAllometry_residuals)
 
 ##Plot shape vs logCS to visualize allometry
 #Diagnostic plots to check if model is appropriate - similar to ANOVA tables
@@ -280,59 +283,158 @@ text(x = allometryplot_pc$plot.args$x, y = allometryplot_pc$plot.args$y, labels 
      pos = 3, offset = 0.5, cex = 0.75) 
 
 #TWO-BLOCK PLS ----
+#Two-block PLS of allometry, another way to visualize connection between logCS and shape, main one for analyses
+minkeAllometry_pls <- two.b.pls(logCsize, minke_coords,iter = 999) 
 
+#Get P-value of regression
+minkeAllometry_pls
 
-allom.pls<-two.b.pls(logCSsize,minke.shape,iter = 999) #Two-block PLS of allometry, another way to visualize connection between logCS and shape, main one for analyses
-summary(allom.pls) #get P-value of regression
-plot(allom.pls,pch=19,col = as.numeric(classifiers)) #Make sure it is ok and save plot with pred line
+#Plot two-block PLS with regression line
+allometryplot_pls <- plot(minkeAllometry_pls, 
+      pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2)   #improve appearance of points
+#Save plot arguments as objects to use in plots
+block1 <- allometryplot_pls$plot.args$x
+block2 <- allometryplot_pls$plot.args$y
+#Add labels
+text(x = block1, y = block2, labels = minke_ind,
+     pos = 3, offset = 0.5, cex = 0.75)   #improve appearance of labels
 
+##Make better PLS plot with ggplot
+#Create data frame object that ggplot can read - use data from plot object you want to improve
+minkeAllometry_pls_plot <- data.frame(block1, block2)
+minkeAllometry_pls_plot
 
-allom.pls.CS<-two.b.pls(CSsize,minke.shape,iter = 999) #Two-block PLS of allometry, another way to visualize connection between CS and shape
-summary(allom.pls.CS) #get P-value of regression
-plot(allom.pls.CS,pch=19,col = as.numeric(classifiers)) #Make sure it is ok and save plot with pred line
+#Convert data frame to tibble
+minkeAllometry_pls_plot <- as_tibble(minkeAllometry_pls_plot)
+glimpse(minkeAllometry_pls_plot)
+View(minkeAllometry_pls_plot)
+#Add labels and other attributes to tibble as columns
+minkeAllometry_pls_plot <- minkeAllometry_pls_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(minkeAllometry_pls_plot)
+
+#Nice plot with specimens colored by age
+ggplot(minkeAllometry_pls_plot, aes(x = block1, y = block2, label = individuals, colour = age))+
+  geom_point(size = 3)+
+  geom_text_repel(colour = "black", size = 3.5)+
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  theme_classic(base_size = 12)+
+  xlab("PLS1 Block 1: logCS")+
+  ylab("PLS1 Block 1: Shape")+
+  ggtitle ("PLS1 plot: Block 1 (logCS) vs Block 2 (Shape)")+
+  theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))
+
+#Nice plot with regression line and confidence intervals - do not color by age or it will mess it up
+ggplot(minkeAllometry_pls_plot, aes(x = block1, y = block2, label = individuals))+
+  geom_point(size = 3, colour = "chartreuse4")+   #colour all points the same
+  theme_classic(base_size = 12)+
+  xlab("PLS1 Block 1: logCS")+
+  ylab("PLS1 Block 2: Shape")+
+  ggtitle ("PLS1 plot: Block 1 (logCS) vs Block 2 (Shape)")+
+  theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))+
+#confidence intervals and reg line using standard function, difficult to do with external model - to try use  function in allometry plot
+  geom_smooth(method='lm', colour = "darkseagreen3", fill = 'gainsboro')+   
+  geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
+                  force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance)
+  
 
 #PCA ALLOMETRY RESIDUALS ----
+#New PCA plot with data corrected for allometry
+PCA_residuals <- gm.prcomp(minkeAllometry_residuals) 
 
-PCAplot.all<-gm.prcomp(minke.shape.all, label = minke.ind,groups = classifiers,legend = TRUE) #New PCA plot with data corrected for allometry
+#List of PC components and proportion of variations
+PCA_residuals
 
+##View plot
+plot(PCA_residuals, main = "PCA residuals",  pch = 21, #title and type of point to be used
+     col = "deeppink", bg = "deeppink", cex = 1, font.main = 2)  #improve graphics
+#Add quick labels to plot
+text(x = PCA_residuals$x[,1], y = PCA_residuals$x[,2], labels = rownames(PCA_residuals$x), 
+     pos = 1, offset = 0.5, cex = 0.75)    #improve graphics
 
-PCAplot.all #List of PC components and proportion of variations
+#Save PC scores as object to use later
+minke_pcscores_res <- PCA_residuals$x
 
+#Save shapes of extremes for axes used in plot
+PC1min_res <- PCA_residuals[["shapes"]][["shapes.comp1"]][["min"]]
+PC1max_res <- PCA_residuals[["shapes"]][["shapes.comp1"]][["max"]] 
+PC2min_res <- PCA_residuals[["shapes"]][["shapes.comp2"]][["min"]] 
+PC2max_res <- PCA_residuals[["shapes"]][["shapes.comp2"]][["max"]] 
 
-summary(PCAplot.all) #Vie) results
+#Show deformation grids on axis from mean shape, do this for all 4 extremes - "TPS" method
+plotRefToTarget(mean_shape_res, PC1min_res, method = "TPS", mag = 1, label = FALSE)  #save image
 
+#Show 3D deformation from mean with points overlay, do this for all 4 extremes - "points" method
+plotRefToTarget(mean_shape_res, PC1min_res, method = "points", mag = 1, label = FALSE)   #save as HTML
 
-plot(PCAplot.all) #View plot
-PC1min.all<-PCAplot.all$pc.shapes$PC1min #Save shapes of extremes for axes used in plot
-PC1max.all<-PCAplot.all$pc.shapes$PC1max #Save shapes of extremes for axes used in plot
-PC2min.all<-PCAplot.all$pc.shapes$PC2min #Save shapes of extremes for axes used in plot
-PC2max.all<-PCAplot.all$pc.shapes$PC2max #Save shapes of extremes for axes used in plot
-PC1min.all.plot<-plotRefToTarget(minke.shape.mean,PC1min.all,method = "TPS",mag = 1, links = links,label = FALSE) #Obtain grids for deformation on axis from mean shape, do this for all 4 extremes
-PC1min.all.plot.3D<-plotRefToTarget(minke.shape.mean,PC1min.all,method = "points",mag = 1, links = links,label = FALSE) #Show 3D deformation from mean, do this for all 4 extremes
-rgl.snapshot(filename = "X.png") #save screenshot of 3D deformation plot, useful for lateral and dorsal views
-#Better use screen snip this fails!
-PC1min.all.plot.mesh<-plotRefToTarget(minke.shape.mean,PC1min.all,method = "surface",mesh=minke.skull3D, mag = 1, label = FALSE) #Show mesh3D that represents extreme of axis, do this for all 4 extremes
-writePLY("PC1min.all.mesh.ply") #save as PLY file
+#Show 3D deformation from mean with vectors, do this for all 4 extremes - "vector" method
+plotRefToTarget(mean_shape_res, PC1min_res, method = "vector", mag = 1, label = FALSE)   #save as screenshot
 
+#Show 3D deformation from mean by warping 3D mesh, do this for all 4 extremes - "surface" method
+plotRefToTarget(mean_shape_res, PC1min_res, mesh = ref_mesh, method = "surface", mag = 1, label = FALSE)   #save as HTML
 
+##3D windows save
+#Save screenshot of 3D window, useful for lateral and dorsal views - use screen snip if it fails
+rgl.snapshot(filename = "Output/X.png") 
+#Save 3D window as html file - 3D widget
+PC1min <- scene3d()
+widget <- rglwidget()
+filename <- tempfile(fileext = ".html")
+htmlwidgets::saveWidget(rglwidget(), filename)
+browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
 
+##Make better PCA plot using ggplot
+#Read PC scores as tibble
+minke_pcscores_res <- as_tibble(minke_pcscores_res)
+glimpse(minke_pcscores_res)
+View(minke_pcscores_res)
+#Add labels and other attributes to tibble as columns
+minke_pcscores_res <- minke_pcscores_res %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(minke_pcscores_res)
+
+#Nice plot
+ggplot(minke_pcscores_res, aes(x = Comp1, y = Comp2, label = individuals, colour = age))+
+  geom_point(size = 3)+
+  geom_text_repel(colour = "black", size = 3.5)+
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+            #legend and color adjustments
+  theme_bw()+
+  xlab("PC 1 (44.15%)")+ #copy this from standard PCA plot
+  ylab("PC 2 (22.79%)")+
+  ggtitle("PCA residuals")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))  #title font and position
 
 
 #ANOVA OF GROUP DIFFERENCES  ----
-dataframe.symm<-geomorph.data.frame(minke.shape,gp=classifiers) #Create dataframe to operate more easily
-age.anova<-procD.lm(minke.shape~gp,iter=999,data=dataframe.symm) #Conduct ANOVA to test differences between groups
-summary(age.anova) #Results and significance
-PCAplot.age.anova<-plotTangentSpace(minke.shape,groups = dataframe.symm$gp,label=minke.ind) #PCA of residuals of ANOVA, highlights groups
+#Create dataframe to operate more easily - use allometry residuals
+minke_dataframe <- geomorph.data.frame(minkeAllometry_residuals, gp = minke_age_tibble$age) 
+
+#Conduct ANOVA to test differences between groups
+minke_age_anova <- procD.lm(minkeAllometry_residuals ~ gp,iter=999, data = minke_dataframe) 
+
+#Results and significance of ANOVA
+summary(minke_age_anova) 
 
 
+#Diagnostic plots to check if model is appropriate - similar to ANOVA tables - DO also if not significant, don't do other plots
+init <- par(no.readonly=TRUE) #store initial plot parameters to restore later
+par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
+age_anova_diagnostics <- plot(minke_age_anova,type = "diagnostics",
+                                  cex = 1.2, font.main = 2)
+par(init)                     #restore initial plot parameters (1 plot showing at a time)
 
 
 
 #TRAJECTORY ANALYSIS ----
-trajectory.age<- trajectory.analysis(minkeAllometry.log,groups = classifiers,traj.pts=2,pca = TRUE,print.progress = TRUE) #Main analysis, use obj from procD.lm
+#Main analysis, use obj from procD.lm
+trajectory_age <- trajectory.analysis(minkeAllometry.log,groups = classifiers,traj.pts=2,pca = TRUE,print.progress = TRUE) 
+
 summary(trajectory.age,show.trajectories = TRUE) #View results
+
 trajectory.plot<-plot(trajectory.age) #Plot results
-add.trajectories(trajectory.plot,traj.pch = 21,traj.col = 1, traj.lty = 1, traj.lwd = 1, traj.cex = 1.5, traj.bg = 1, start.bg = 3, end.bg = 2) #Add line between groups
+
+#Add line between groups
+add.trajectories(trajectory.plot,traj.pch = 21,traj.col = 1, traj.lty = 1, traj.lwd = 1, traj.cex = 1.5, traj.bg = 1, start.bg = 3, end.bg = 2) 
 
 #SYMMETRY ANALYSIS ----
 
