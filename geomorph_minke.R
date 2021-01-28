@@ -426,15 +426,71 @@ par(init)                     #restore initial plot parameters (1 plot showing a
 
 
 #TRAJECTORY ANALYSIS ----
-#Main analysis, use obj from procD.lm
-trajectory_age <- trajectory.analysis(minkeAllometry.log,groups = classifiers,traj.pts=2,pca = TRUE,print.progress = TRUE) 
+#Shows trajectories of variation using groups, use obj from procD.lm
+#Trajectory points must be defined and they can either be a factor to assess different trajectories within groups or they should be = to the nummber of groups
+trajectory_age <- trajectory.analysis(minkeAllometry_log, groups = minke_age_tibble$age, traj.pts = 2, pca = TRUE, print.progress = TRUE) 
 
-summary(trajectory.age,show.trajectories = TRUE) #View results
+#View results
+#Magnitude differences between trajectories, standard summary - are trajectories different?
+summary(trajectory_age, show.trajectories = TRUE, attribute = "MD") 
+#Trajectory correlations - only useful if there are significant differences 
+summary(trajectory_age, show.trajectories = TRUE, attribute = "TC", angle.type = "deg")
+#Trajectory shape differences - can only be used if each trajectory/group has 3 or more points/specimens - what is the distance between trajectories?
+summary(trajectory_age, show.trajectories = TRUE, attribute = "SD") 
 
-trajectory.plot<-plot(trajectory.age) #Plot results
-
+#Plot results - PCA of fitted values, similar to CVA
+trajectory_plot <- plot(trajectory_age, main = "Trajectories by age",  pch = 21, #title and type of point to be used
+                        col = "gray", bg = "gray", cex = 1, font.main = 2) #improve graphics
 #Add line between groups
-add.trajectories(trajectory.plot,traj.pch = 21,traj.col = 1, traj.lty = 1, traj.lwd = 1, traj.cex = 1.5, traj.bg = 1, start.bg = 3, end.bg = 2) 
+add.trajectories(trajectory_plot, traj.pch = 21, traj.col = 1, traj.lty = 1, traj.lwd = 1, traj.cex = 1.5, traj.bg = 1, start.bg = 3, end.bg = 2) 
+
+#doesn't work -> legend("right", legend = minke_age)
+
+##Make better PCA plot using ggplot
+#Read PC scores as tibble
+trajectory_pcscores <- as_tibble(trajectory_plot[["pc.points"]])
+glimpse(trajectory_pcscores)
+
+#Find out order of group variables
+glimpse(trajectory_plot[["trajectories"]])
+
+#Create data frame that contains the group variables in order and that has = number of rows to pc score points
+rows_to_repeat <- bind_rows(data.frame(group = "adult", counter = 1:12), data.frame(group = "earlyFetus", counter=13:24), 
+                            data.frame(group ="lateFetus", counter=25:36), data.frame(group = "neonate", counter=37:48))
+glimpse(rows_to_repeat)
+#Delete extra counter column
+rows_to_repeat <- rows_to_repeat [,-2]
+
+#Add group names and other attributes to tibble as columns
+trajectory_pcscores <- trajectory_pcscores %>% mutate(age = rows_to_repeat)
+glimpse(trajectory_pcscores)
+
+#Calculate means of PC1 and PC2 per group to draw trajectories
+trajectory_pcscores_means <- trajectory_pcscores %>% group_by(age)  %>%
+  summarise_at(vars(PC1, PC2), list(mean = mean))              #function for means, both columns
+glimpse(trajectory_pcscores_means)
+
+#Nice plot
+ggplot(trajectory_pcscores, aes(x = PC1, y = PC2, colour = age))+
+  geom_point(size = 3)+
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+            #legend and color adjustments
+  theme_bw()+
+  xlab("PC 1 (60.17%)")+ #copy this from standard PCA plot
+  ylab("PC 2 (30.92%)")+
+  ggtitle("Trajectories by age")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))+#title font and position
+  #add trajectory lines, one line for each, write numbers manually from tibble
+  geom_segment(data = trajectory_pcscores_means, aes(x = 0.3036804, y = 0.1394911, #neonate
+                                                     xend = -0.3018892, yend = 0.3621856, colour = age), #adult
+                   arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+  #add arrow at end
+  geom_segment(data = trajectory_pcscores_means, aes(x = -0.4355347, y = -0.3273051, #lateF
+                                                     xend = 0.3036804, yend = 0.1394911, colour = age), #neonate
+             arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+
+  geom_segment(data = trajectory_pcscores_means, aes(x = 0.4337435, y = -0.1743717,  #earlyF
+                                                     xend =  -0.4355347, yend = -0.3273051, colour = age), #lateF
+                arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))
+  
 
 #SYMMETRY ANALYSIS ----
 
