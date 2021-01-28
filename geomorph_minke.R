@@ -660,19 +660,52 @@ ggplot(minke_pcscores_sym_res, aes(x = Comp1, y = Comp2, label = individuals, co
 
 #MODULARITY TEST ----
 #Set all landmarks in one module
-land.gps<-rep('a',16) 
+modules <- rep('a',16) 
 
-land.gps[4:9]<-'b' #Put selected landmarks in second module
+#Put selected landmarks in second module
+modules[4:9]<-'b' 
+modules[14:16]<-'b' 
+modules
 
-land.gps[14:16]<-'b' #Put selected landmarks in second module
+#Perform modularity test - compare selected modules to the null assumption of random assignment of partitions (no modularity at all) - is the data modular?
+#Best done on alloemtric residuals - NOT ON SYMMETRY data, not a biological significant hypothesis and little difference
+modularity_test <- modularity.test(minkeAllometry_residuals, modules, CI = T,iter = 999, print.progress = T) 
 
-MT <- modularity.test(minke.shape.all,land.gps,CI=F,iter=999, print.progress = T) #Perform modularity test
+#Get P value for CR values (same as RV)
+summary(modularity_test) 
 
-summary(MT) #Get P value for CR values (same as RV)
+#Histogram of CR values
+plot(modularity_test)
 
-plot(MT) #Histogram of CR values
+##Make better histogram plot with ggplot
+#Create tibble with modularity analysis values
+modularity_plot <- data.frame(CR = modularity_test[["CR.boot"]])
+modularity_plot <- as_tibble(modularity_plot )
+#Save CR of data as object
+CRdata <- modularity_test[["CR"]]
 
-IT <- integration.test(minke.shape.all, partition.gp=land.gps, iter=999, print.progress =T) #Perform integration test between the 2 modules (PLS)
+#Calculate mean of observation for arrow
+mean_CR <- modularity_plot %>% summarize(mean = mean(CR))
+mean_CR <- data.frame(mean_CR)
+
+#Nice plot
+ggplot(modularity_plot, aes(CR))+
+  geom_histogram(binwidth = 0.01, fill = "azure2", colour = "azure4")+
+  geom_segment(aes(x = 0.8817763, xend = 0.8817763, y = 34, yend = 43, colour = "firebrick4"),
+               arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "first", type = "closed"))+
+  geom_segment(aes(x = 0.9444502, xend = 0.9444502, y = 45, yend = 54, colour = "black"),
+               arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "first", type = "closed"))+
+  scale_colour_manual(name = NULL, labels = c("CR data", "mean CR"), 
+                      values = c("firebrick4","black"))+            #legend and color adjustments
+  theme_minimal()+
+  xlab("CR coefficient")+
+  ylab("Frequency")+
+  ggtitle("Modularity analysis - p-value=0.0003")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+
+#Perform integration test between the 2 modules (two-block PLS within configuration) - how are the two or more modules related to each other?
+IT <- integration.test(minke.shape.all, partition.gp=land.gps, iter=999, print.progress =T) 
 
 summary(IT) #Get P value and PLS results
 
