@@ -493,29 +493,189 @@ ggplot(trajectory_pcscores, aes(x = PC1, y = PC2, colour = age))+
   
 
 #SYMMETRY ANALYSIS ----
+#Create links between pairs of symmetric landmarks across line of symmetry to then run symmetry analysis
+landpairs <- define.links(mean_shape, ptsize = 4) 
 
-#Create links between landmarks across line of symmetry to then run symmetry analysis
-minke.landpairs<-define.links(mean.shape, ptsize = 2) 
 #Analysis of bilateral symmetry to then work on symmetric component alone
-minke.sym<-bilat.symmetry(minke.allcoords,ind=minke.ind, object.sym = TRUE,land.pairs = minke.landpairs) 
-#Check ANOVA results
-minke.sym 
+minke_sym <- bilat.symmetry(minke_coords,ind = minke_ind, object.sym = TRUE, land.pairs = landpairs) 
+
+#Check ANOVA results - significance value of analysis - if no significant value for "side" means objects are symmetrical
+summary(minke_sym)
+
 #Create object to work on symmetric component alone
-minke.shape<-minke.sym$symm.shape 
+minke_sym_shape <- minke_sym$symm.shape 
+
 #Mean shape of symmetric component, to use for analysis
-minke.shape.mean<-mshape(minke.shape) 
-#plot specimens to make sure it works
-plotAllSpecimens(minke.shape,links = links) 
+mean_shape_sym <- mshape(minke_sym_shape) 
+
+#Plot on mesh to visualize asymmetry
+plot(minke_sym, warpgrids = TRUE, mesh = ref_mesh) 
+#Save 3D window as html file - 3D widget
+PC1min <- scene3d()
+widget <- rglwidget()
+filename <- tempfile(fileext = ".html")
+htmlwidgets::saveWidget(rglwidget(), filename)
+browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
+
+##Perform allometric correction and PCA on symmetry-only shapes
+##Allometry regression
+minkeAllometry_sym_log <- procD.lm(minke_sym_shape~logCsize, iter=999, print.progress = TRUE) 
+
+#Main results of ANOVA analysis of allometry with logCS
+summary(minkeAllometry_sym_log) 
+
+#Create residuals array to then save as coordinates for analyses
+shape_residuals_sym <- arrayspecs(minkeAllometry_sym_log$residuals,p=dim(minke_sym_shape)[1], k=dim(minke_sym_shape)[2]) 
+
+#New shapes adjusted for allometry with CS to use in analyses
+minkeAllometry_sym_residuals <- shape_residuals_sym + array(mean_shape_sym, dim(shape_residuals_sym)) 
+
+#Save mean shape of allometry-adjusted shapes to sue later
+mean_shape_sym_res <- mshape(minkeAllometry_sym_residuals)
+
+##Plot shape vs logCS to visualize allometry
+#Diagnostic plots to check if model is appropriate - similar to ANOVA tables
+init <- par(no.readonly=TRUE) #store initial plot parameters to restore later
+par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
+allometryplot_sym_diagnostics <- plot(minkeAllometry_sym_log,type = "diagnostics",
+                                  cex = 1.2, font.main = 2)
+par(init)                     #restore initial plot parameters (1 plot showing at a time)
+
+
+#Regression score of shape vs logCS - regression method with regression score plotting
+allometryplot_sym_regscore <- plot(minkeAllometry_sym_log,type = "regression",predictor = logCsize, reg.type = "RegScore",
+                               main = "Symmetric shape vs logCS",xlab = "logCS", pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)   #improve graphics
+
+##Make better allometry plot with ggplot
+#Create data frame object that ggplot can read - use data from plot object you want to improve
+minkeAllometry_sym_plot <- data.frame(logCS = allometryplot_sym_regscore[["plot.args"]][["x"]], 
+                                      RegScores = allometryplot_sym_regscore[["plot.args"]][["y"]])
+
+#Convert data frame to tibble
+minkeAllometry_sym_plot <- as_tibble(minkeAllometry_sym_plot)
+glimpse(minkeAllometry_sym_plot)
+#Add labels and other attributes to tibble as columns
+minkeAllometry_sym_plot <- minkeAllometry_sym_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(minkeAllometry_sym_plot)
+
+#Nice plot with specimens colored by age
+ggplot(minkeAllometry_sym_plot, aes(x = logCS, y = RegScores, label = individuals, colour = age))+
+  geom_point(size = 3)+
+  geom_text_repel(colour = "black", size = 3.5)+
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  theme_classic(base_size = 12)+
+  ylab("Regression Score")+
+  ggtitle ("Symmetric shape vs logCS")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+##Add regression line with confidence intervals
+#Create object to use for linear model
+reg_scores_sym <- allometryplot_sym_regscore[["RegScore"]] 
+
+#Linear model for line
+reg_line_sym <- (lm(reg_scores_sym~logCsize))
+
+#Add confidence intervals
+#Create data for confidence intervals
+x_vals <- seq(min(logCsize), max(logCsize), length = 12)   #use min and max of x values (logCS) as limits and use number of specimens as length of sequence
+newX <- expand.grid(logCsize = x_vals)                     #warp x_vals on values of x axis (logCS)
+newY <- predict(reg_line_sym, newdata = data.frame(x = newX), interval="confidence",
+                level = 0.95)                                      #predict the y values based on the x sequence
+
+#Make data frame of data for confidence intervals
+conf_intervals_sym <- data.frame(newX, newY)
+#Rename columns to match main plot tibble varibales for x and y
+conf_intervals_sym <- rename(conf_intervals_sym, logCS = logCsize, RegScores = fit)
+conf_intervals_sym
+
+#Convert data frame to tibble
+conf_intervals_sym <- as_tibble(conf_intervals_sym)
+glimpse(conf_intervals_sym)
+#Add labels and other attributes to tibble as columns to match main plot tibble
+conf_intervals_sym <- conf_intervals_sym %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(conf_intervals_sym)
+
+#Nice plot with regression line and confidence intervals - do not color by age or it will mess it up
+ggplot(minkeAllometry_sym_plot, aes(x = logCS, y = RegScores, label = individuals))+
+  geom_point(size = 3, colour = "chartreuse4")+   #colour all points the same
+  theme_classic(base_size = 12)+
+  ylab("Regression Score")+
+  ggtitle ("Symmetric shape vs logCS")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))+
+  geom_smooth(data = conf_intervals_sym, aes(ymin = lwr, ymax = upr), stat = 'identity',     #confidence intervals and reg line
+              colour = "darkseagreen3", fill = 'gainsboro')+                             #line colour and interval fill
+  geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
+                  force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance)
+
+##New PCA plot with data corrected for allometry and symmetry
+PCA_sym_residuals <- gm.prcomp(minkeAllometry_sym_residuals) 
+
+#List of PC components and proportion of variations
+PCA_sym_residuals
+
+#Save PC scores as object to use later
+minke_pcscores_sym_res <- PCA_sym_residuals$x
+
+#Save shapes of extremes for axes used in plot
+PC1min_sym_res <- PCA_sym_residuals[["shapes"]][["shapes.comp1"]][["min"]]
+PC1max_sym_res <- PCA_sym_residuals[["shapes"]][["shapes.comp1"]][["max"]] 
+PC2min_sym_res <- PCA_sym_residuals[["shapes"]][["shapes.comp2"]][["min"]] 
+PC2max_sym_res <- PCA_sym_residuals[["shapes"]][["shapes.comp2"]][["max"]] 
+
+#Show deformation grids on axis from mean shape, do this for all 4 extremes - "TPS" method
+plotRefToTarget(mean_shape_sym_res, PC1min_sym_res, method = "TPS", mag = 1, label = FALSE)  #save image
+
+#Show 3D deformation from mean by warping 3D mesh, do this for all 4 extremes - "surface" method
+plotRefToTarget(mean_shape_sym_res, PC1min_sym_res, mesh = ref_mesh, method = "surface", mag = 1, label = FALSE)   #save as HTML
+
+##3D windows save
+#Save 3D window as html file - 3D widget
+PC1min <- scene3d()
+widget <- rglwidget()
+filename <- tempfile(fileext = ".html")
+htmlwidgets::saveWidget(rglwidget(), filename)
+browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
+
+##Make better PCA plot using ggplot
+#Read PC scores as tibble
+minke_pcscores_sym_res <- as_tibble(minke_pcscores_sym_res)
+glimpse(minke_pcscores_sym_res)
+#Add labels and other attributes to tibble as columns
+minke_pcscores_sym_res <- minke_pcscores_sym_res %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(minke_pcscores_sym_res)
+
+#Nice plot
+ggplot(minke_pcscores_sym_res, aes(x = Comp1, y = Comp2, label = individuals, colour = age))+
+  geom_point(size = 3)+
+  geom_text_repel(colour = "black", size = 3.5)+
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+            #legend and color adjustments
+  theme_bw()+
+  xlab("PC 1 (47.38%)")+ #copy this from standard PCA plot or from PCA summary
+  ylab("PC 2 (23.76%)")+
+  ggtitle("PCA symmetry residuals")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))  #title font and position
+
 
 #MODULARITY TEST ----
-land.gps<-rep('a',16) #Set all landmarks in one module
+#Set all landmarks in one module
+land.gps<-rep('a',16) 
+
 land.gps[4:9]<-'b' #Put selected landmarks in second module
+
 land.gps[14:16]<-'b' #Put selected landmarks in second module
+
 MT <- modularity.test(minke.shape.all,land.gps,CI=F,iter=999, print.progress = T) #Perform modularity test
+
 summary(MT) #Get P value for CR values (same as RV)
+
 plot(MT) #Histogram of CR values
+
 IT <- integration.test(minke.shape.all, partition.gp=land.gps, iter=999, print.progress =T) #Perform integration test between the 2 modules (PLS)
+
 summary(IT) #Get P value and PLS results
+
 plot(IT) #PLS plot of the modules
 
 #GROUP MEANS FOR PHYLOGENTIC/AGE ANALYSIS ----
