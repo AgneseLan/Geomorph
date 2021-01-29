@@ -14,7 +14,7 @@ minke_raw <- read_csv("Data/16minkeonly.csv")
 glimpse(minke_raw)
 
 #Average landmark takes
-minke_avg_takes<-minke_raw %>% group_by(specimenID) %>% summarize(across(starts_with("Raw"), list(mean)))
+minke_avg_takes <- minke_raw %>% group_by(specimenID) %>% summarize(across(starts_with("Raw"), list(mean)))
 glimpse(minke_avg_takes)
 
 #Create data frame with only numerical values and set row names as specimen ID
@@ -25,7 +25,7 @@ minke_avg_takes <- minke_avg_takes2
 remove(minke_avg_takes2) #change name and remove extra object
 
 #Save individual names as object
-minke_ind<-row.names(minke_avg_takes) 
+minke_ind <- row.names(minke_avg_takes) 
 
 #Transform in 3D array, first number is number of landmarks, second is dimensions (2 or 3)
 minke_array <- arrayspecs(minke_avg_takes, 16, 3) 
@@ -38,9 +38,9 @@ minke_age_tibble <- minke_raw %>%
   distinct()               #this only keeps in the tibble unique combinations of the two values, so you get a tibble with the same number or rows as the data frame
 glimpse(minke_age_tibble)
 has_rownames(minke_age_tibble)    #always check
-#Make data frame for analysis in geomorph
-minke_age <- data.frame(column_to_rownames(minke_age_tibble, var = "specimenID")) #adding row names to the tibble and making it a data frame
-minke_age <- factor(minke_age) #transform data to factors
+
+#Save classifiers as factors from tibble
+minke_age <- as.factor(minke_age_tibble$age)
 
 #remove objects that are not needed (e.g. "links")
 remove(A) 
@@ -556,7 +556,7 @@ ggplot(minke_pcscores_res, aes(x = Comp1, y = Comp2, label = individuals, colour
 
 #ANOVA and PROCUSTES VARIANCES OF GROUP DIFFERENCES  ----
 #Create dataframe to operate more easily - use allometry residuals
-minke_dataframe <- geomorph.data.frame(minkeAllometry_residuals, gp = minke_age_tibble$age) 
+minke_dataframe <- geomorph.data.frame(minkeAllometry_residuals, gp = minke_age) 
 
 #Conduct ANOVA to test differences between groups
 minke_age_anova <- procD.lm(minkeAllometry_residuals ~ gp,iter=999, data = minke_dataframe) 
@@ -572,14 +572,12 @@ age_anova_diagnostics <- plot(minke_age_anova,type = "diagnostics",
 par(init)                     #restore initial plot parameters (1 plot showing at a time)
 
 
-##Morphological disparity - calculate Procrustes variances and distances between groups after allometric correction
-minke_age_disparity <- morphol.disparity(minkeAllometry_residuals ~ 1, data = minke_dataframe, iter = 999)
+##Morphological disparity 
+#Calculate Procrustes variances and distances between groups after allometric correction
+minke_age_disparity <- morphol.disparity(minkeAllometry_residuals ~ 1, groups = ~ minke_age, iter = 999) #do NOT use dataframe, issues with groups
 
+#Results and significance
 summary(minke_age_disparity) 
-
-minke_age_disparity
-
-plot(minke_age_disparity)
 
 #TRAJECTORY ANALYSIS ----
 #Shows trajectories of variation using groups, use obj from procD.lm
