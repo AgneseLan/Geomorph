@@ -7,6 +7,7 @@ library(tidyr)
 library(tidyverse)
 library(ggrepel)
 
+
 #DATA IMPORT AND PREP ----
 
 #Import data into R, make sure only first columns are not numbers
@@ -223,7 +224,7 @@ ggplot(minke_pcscores_all_tibble, aes(x = size, y = Comp2, label = individuals, 
   theme_classic(base_size = 12)+
   xlab("logCS")+
   ylab("PC 2 (22.17%)")+
-  #line on plot, can change graphical paramters IF not a separate dataset
+  #line on plot, can change graphical parameters IF not a separate dataset
   geom_abline(intercept = -0.1794482, slope = 0.06444064, colour = "blue", size = 1, linetype = "dashed", show.legend = FALSE)+ 
   geom_text_repel(colour = "black", size = 3.5)
 
@@ -624,6 +625,10 @@ trajectory_pcscores_means <- trajectory_pcscores %>% group_by(age)  %>%
   summarise_at(vars(PC1, PC2), list(mean = mean))              #function for means, both columns
 glimpse(trajectory_pcscores_means)
 
+#Rename columns so they are easier to use for plot
+trajectory_pcscores_means <- trajectory_pcscores_means %>% rename(x = PC1_mean, y = PC2_mean)
+trajectory_pcscores_means
+
 #Nice plot
 ggplot(trajectory_pcscores, aes(x = PC1, y = PC2, colour = age))+
   geom_point(size = 3)+
@@ -633,16 +638,16 @@ ggplot(trajectory_pcscores, aes(x = PC1, y = PC2, colour = age))+
   xlab("PC 1 (60.17%)")+ #copy this from standard PCA plot
   ylab("PC 2 (30.92%)")+
   ggtitle("Trajectories by age")+
-  theme(plot.title = element_text(face = "bold", hjust = 0.5))+#title font and position
-  #add trajectory lines, one line for each, write numbers manually from tibble
-  geom_segment(data = trajectory_pcscores_means, aes(x = 0.3036804, y = 0.1394911, #neonate
-                                                     xend = -0.3018892, yend = 0.3621856, colour = age), #adult
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))+  #title font and position
+ #add trajectory lines, one line for each, write column name and row number form tibble
+  geom_segment(data = trajectory_pcscores_means, aes(x = x[4], y = y[4], #neonate
+                   xend = x[1], yend = y[1]),  #adult 
                    arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+  #add arrow at end
-  geom_segment(data = trajectory_pcscores_means, aes(x = -0.4355347, y = -0.3273051, #lateF
-                                                     xend = 0.3036804, yend = 0.1394911, colour = age), #neonate
+  geom_segment(data = trajectory_pcscores_means, aes(x = x[3], y = y[3], #lateF
+                                                     xend = x[4], yend = y[4], colour = age), #neonate
              arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+
-  geom_segment(data = trajectory_pcscores_means, aes(x = 0.4337435, y = -0.1743717,  #earlyF
-                                                     xend =  -0.4355347, yend = -0.3273051, colour = age), #lateF
+  geom_segment(data = trajectory_pcscores_means, aes(x = x[2], y = y[2],  #earlyF
+                                                     xend =  x[3], yend = y[3], colour = age), #lateF
                 arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))
   
 
@@ -821,8 +826,9 @@ modules[4:9]<-'b'
 modules[14:16]<-'b' 
 modules
 
-#Perform modularity test - compare selected modules to the null assumption of random assignment of partitions (no modularity at all) - is the data modular?
-#Best done on alloemtric residuals - NOT ON SYMMETRY data, not a biological significant hypothesis and little difference
+#Perform modularity test - compare selected modules to the null assumption of random assignment of partitions (no modularity at all) 
+#Is the data modular according to my defined modules?
+#Best done on allometric residuals - NOT ON SYMMETRY data, not a biological significant hypothesis and little difference
 modularity_test <- modularity.test(minkeAllometry_residuals, modules, CI = T,iter = 999, print.progress = T) 
 
 #Get P value for CR values (same as RV)
@@ -857,13 +863,65 @@ ggplot(modularity_plot, aes(CR))+
   ggtitle("Modularity analysis - p-value=0.0003")+
   theme(plot.title = element_text(face = "bold", hjust = 0.5))
 
+##Perform integration test between the 2 modules (two-block PLS within configuration) 
+#How much are the two or more modules integrated with each other?
+#Best done on allometric residuals - NOT ON SYMMETRY data, not a biological significant hypothesis and little difference
+integration_test <- integration.test(minkeAllometry_residuals, partition.gp = modules, iter = 999, print.progress = T) 
 
-#Perform integration test between the 2 modules (two-block PLS within configuration) - how are the two or more modules related to each other?
-IT <- integration.test(minke.shape.all, partition.gp=land.gps, iter=999, print.progress =T) 
+#Get P value and effect size Z - if significant means the modules are integrated!
+summary(integration_test) 
 
-summary(IT) #Get P value and PLS results
+#PLS plot of the two modules - two-block PLS with regression line
+modulesplot_pls <- plot(integration_test,
+                        pch = 21, col = "darkgoldenrod2", bg = "darkgoldenrod2", cex = 1.2) 
+#Save plot arguments as objects to use in plots
+block1_modules <- modulesplot_pls$plot.args$x
+block2_modules <- modulesplot_pls$plot.args$y
+#Add labels
+text(x = block1_modules, y = block2_modules, labels = minke_ind,
+     pos = 3, offset = 0.5, cex = 0.75)   #improve appearance of labels
 
-plot(IT) #PLS plot of the modules
+##Make better PLS plot with ggplot
+#Create data frame object that ggplot can read - use data from plot object you want to improve
+modules_pls_plot <- data.frame(block1_modules, block2_modules)
+modules_pls_plot
+
+#Convert data frame to tibble
+modules_pls_plot <- as_tibble(modules_pls_plot)
+glimpse(modules_pls_plot)
+#Add labels and other attributes to tibble as columns
+modules_pls_plot <- modules_pls_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(modules_pls_plot)
+
+#Nice plot with specimens colored by age
+ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = individuals, colour = age))+
+  geom_point(size = 3)+
+  geom_text_repel(colour = "black", size = 3.5)+
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  theme_classic(base_size = 12)+
+  xlab("PLS1 Block 1: rostrum")+
+  ylab("PLS1 Block 1: braincase")+
+  ggtitle ("PLS1 plot: Block 1 (rostrum) vs Block 2 (braincase)")+
+  theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))
+
+#Nice plot with regression line and confidence intervals - do not color by age or it will mess it up
+ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = individuals))+
+  geom_point(size = 3, colour = "darkgoldenrod2")+   #colour all points the same
+  theme_classic(base_size = 12)+
+  xlab("PLS1 Block 1: rostrum")+
+  ylab("PLS1 Block 1: braincase")+
+  ggtitle ("PLS1 plot: Block 1 (rostrum) vs Block 2 (braincase)")+
+  theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))+
+ #confidence intervals and reg line using standard function, difficult to do with external model - to try use  function in allometry plot
+  geom_smooth(method='lm', colour = "khaki3", fill = 'gainsboro')+   
+  geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
+                  force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance)
+
+#Use this to save points represneting extremes of deformation - not very good graphics
+picknplot.shape(modulesplot_pls, label = TRUE, mag = 0.5)
+
+#Might be possible to improve using shape.predictor and plotRefToTarget BUT different mesh needed for each module and need to find new data coordinates
 
 #GROUP MEANS FOR PHYLOGENTIC/AGE ANALYSIS ----
 trees<-"trees_age.nex" #Add trees in Nexus format
