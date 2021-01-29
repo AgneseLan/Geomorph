@@ -163,7 +163,70 @@ ggplot(minke_pcscores_all, aes(x = Comp1, y = Comp2, label = individuals, colour
   ylab("PC 2 (22.17%)")+
   ggtitle("PCA all data")+
   theme(plot.title = element_text(face = "bold", hjust = 0.5))  #title font and position
-  
+
+##Regression PC1 and PC2 vs logCS
+#Create data frame with data
+minke_pcscores_all_df <- data.frame(PCA_all$x , size = logCsize)
+minke_pcscores_all_df
+
+#Calculate regression for each component
+PC1_size_reg <- lm(Comp1~size, data = minke_pcscores_all_df)
+PC2_size_reg <- lm(Comp2~size, data = minke_pcscores_all_df)
+
+#View results and p-value
+summary(PC1_size_reg)
+summary(PC2_size_reg)
+
+#Diagnostic plots for both regressions
+init <- par(no.readonly=TRUE) #store initial plot parameters to restore later
+par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
+plot(PC1_size_reg, cex = 1.2, font.main = 2)
+plot(PC2_size_reg, cex = 1.2, font.main = 2)                             
+par(init)                     #restore initial plot parameters (1 plot showing at a time)
+
+#Plot regression with ggplot
+#Convert data frame to tibble
+minke_pcscores_all_tibble <- as_tibble(minke_pcscores_all_df)
+glimpse(minke_pcscores_all_tibble)
+#Add labels and other attributes to tibble as columns
+minke_pcscores_all_tibble <- minke_pcscores_all_tibble %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(minke_pcscores_all_tibble)
+
+#Create data frame with line parameters from regression
+#Allows to show a line on PC plot with specimens colored IF manual numbers are instead instead of using data frame or tibble
+PC1_reg_line <- data.frame(int = PC1_size_reg[["coefficients"]][["(Intercept)"]], slope = PC1_size_reg[["coefficients"]][["size"]])
+PC1_reg_line
+
+#Nice plot with specimens colored by age and line - no title
+ggplot(minke_pcscores_all_tibble, aes(x = size, y = Comp1, label = individuals, colour = age))+
+  geom_point(size = 3)+
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  theme_classic(base_size = 12)+
+  xlab("logCS")+
+  ylab("PC 1 (48.89%)")+
+#line on plot, can change graphical paramters IF not a separate dataset
+  geom_abline(intercept = 0.5375881, slope = -0.1930502, colour = "blue", size = 1, linetype = "dashed", show.legend = FALSE)+ 
+  geom_text_repel(colour = "black", size = 3.5)
+
+#Repeat for other component
+#Create data frame with line parameters from regression
+#Allows to show a line on PC plot with specimens colored IF manual numbers are instead instead of using data frame or tibble
+PC2_reg_line <- data.frame(int = PC2_size_reg[["coefficients"]][["(Intercept)"]], slope = PC2_size_reg[["coefficients"]][["size"]])
+PC2_reg_line
+
+#Nice plot with specimens colored by age and line - no title
+ggplot(minke_pcscores_all_tibble, aes(x = size, y = Comp2, label = individuals, colour = age))+
+  geom_point(size = 3)+
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  theme_classic(base_size = 12)+
+  xlab("logCS")+
+  ylab("PC 2 (22.17%)")+
+  #line on plot, can change graphical paramters IF not a separate dataset
+  geom_abline(intercept = -0.1794482, slope = 0.06444064, colour = "blue", size = 1, linetype = "dashed", show.legend = FALSE)+ 
+  geom_text_repel(colour = "black", size = 3.5)
+
 
 #ALLOMETRY CORRECTION ----
 ##Evaluate allometry and get the allometry-free shapes using LogCS, use this for analyses
@@ -501,7 +564,6 @@ minke_age_anova <- procD.lm(minkeAllometry_residuals ~ gp,iter=999, data = minke
 #Results and significance of ANOVA
 summary(minke_age_anova) 
 
-
 #Diagnostic plots to check if model is appropriate - similar to ANOVA tables - DO also if not significant, don't do other plots
 init <- par(no.readonly=TRUE) #store initial plot parameters to restore later
 par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
@@ -510,11 +572,14 @@ age_anova_diagnostics <- plot(minke_age_anova,type = "diagnostics",
 par(init)                     #restore initial plot parameters (1 plot showing at a time)
 
 
-##Morphological disparity - calculate Procrustes variances and distances between groups
-morphol.disparity(coords ~ 1, groups = NULL, data = gdf, 
-                  iter = 999, print.progress = FALSE)
+##Morphological disparity - calculate Procrustes variances and distances between groups after allometric correction
+minke_age_disparity <- morphol.disparity(minkeAllometry_residuals ~ 1, data = minke_dataframe, iter = 999)
 
+summary(minke_age_disparity) 
 
+minke_age_disparity
+
+plot(minke_age_disparity)
 
 #TRAJECTORY ANALYSIS ----
 #Shows trajectories of variation using groups, use obj from procD.lm
