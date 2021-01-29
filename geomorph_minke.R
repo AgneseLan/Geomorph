@@ -282,6 +282,92 @@ allometryplot_pc <- plot(minkeAllometry_log,type = "PC",
 text(x = allometryplot_pc$plot.args$x, y = allometryplot_pc$plot.args$y, labels = minke_ind,
      pos = 3, offset = 0.5, cex = 0.75) 
 
+##Specific plotAllometry functions - "CAC" and "size.shape" PCA (unclear what is the purpose of size-shape PCA, will not use)
+#CAC plot - for simple allometry is the same as RegScore plot and two-block PLS plot of shape and size
+allometryplot_CAC <- plotAllometry(minkeAllometry_log, size = logCsize, logsz = FALSE, method = "CAC", 
+                      main = "CAC plot", pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)   #improve graphics
+
+##Make better CAC allometry plot with ggplot
+#Create data frame object that ggplot can read - use data from plot object you want to improve
+minkeAllometry_CAC_plot <- data.frame(logCS = allometryplot_CAC[["size.var"]], CAC = allometryplot_CAC[["CAC"]], #common allometric component
+                                      RSC1 = allometryplot_CAC[["all.plot.args"]][["RSC"]][["x"]])               #main residual shape component
+minkeAllometry_CAC_plot
+
+#Convert data frame to tibble
+minkeAllometry_CAC_plot <- as_tibble(minkeAllometry_CAC_plot)
+glimpse(minkeAllometry_CAC_plot)
+#Add labels and other attributes to tibble as columns
+minkeAllometry_CAC_plot <- minkeAllometry_CAC_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(minkeAllometry_CAC_plot)
+
+##Two plots: CAC vs logCsize (A) and RSC1 vs CAC (B)
+#Plot A
+##Add regression line with confidence intervals
+#Create object to use for linear model
+reg_scores_CAC <- allometryplot_CAC[["CAC"]]
+
+#Linear model for line
+reg_line_CAC <- (lm(reg_scores_CAC~logCsize))
+
+#Add confidence intervals
+#Create data for confidence intervals
+x_vals <- seq(min(logCsize), max(logCsize), length = 12)   #use min and max of x values (logCS) as limits and use number of specimens as length of sequence
+newX <- expand.grid(logCsize = x_vals)                     #warp x_vals on values of x axis (logCS)
+newY <- predict(reg_line_CAC, newdata = data.frame(x = newX), interval="confidence",
+                level = 0.95)                                      #predict the y values based on the x sequence
+
+#Make data frame of data for confidence intervals
+conf_intervals_CAC <- data.frame(newX, newY)
+#Rename columns to match main plot tibble varibales for x and y
+conf_intervals_CAC <- rename(conf_intervals_CAC, logCS = logCsize, CAC = fit)
+conf_intervals_CAC
+
+#Convert data frame to tibble
+conf_intervals_CAC <- as_tibble(conf_intervals_CAC)
+glimpse(conf_intervals_CAC)
+#Add labels and other attributes to tibble as columns to match main plot tibble
+conf_intervals_CAC <- conf_intervals_CAC %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(conf_intervals_CAC)
+
+#Nice plot with specimens colored by age - no labels
+ggplot(minkeAllometry_CAC_plot, aes(x = logCS, y = CAC, label = individuals, colour = age))+
+  geom_point(size = 3)+
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  theme_classic(base_size = 12)+
+  ggtitle ("CAC vs logCS")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+#Nice plot with regression line and confidence intervals - no labels - do not color by age or it will mess it up
+ggplot(minkeAllometry_CAC_plot, aes(x = logCS, y = CAC, label = individuals))+
+  geom_point(size = 3, colour = "chartreuse4")+   #colour all points the same
+  theme_classic(base_size = 12)+
+  ggtitle ("CAC vs logCS")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))+
+  geom_smooth(data = conf_intervals_CAC, aes(ymin = lwr, ymax = upr), stat = 'identity',     #confidence intervals and reg line
+              colour = "darkseagreen3", fill = 'gainsboro')                            #line colour and interval fill
+  
+#Plot B
+#Confidence intervals and reg line using standard function, difficult to do with external model - residuals too small
+
+#Nice plot with specimens colored by age - no labels
+ggplot(minkeAllometry_CAC_plot, aes(x = CAC, y = RSC1, label = individuals, colour = age))+
+  geom_point(size = 3)+
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  theme_classic(base_size = 12)+
+  ggtitle ("Residual shape component (RSC) 1 vs CAC")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+#Nice plot with regression line and confidence intervals - no labels - do not color by age or it will mess it up
+ggplot(minkeAllometry_CAC_plot, aes(x = CAC, y = RSC1, label = individuals))+
+  geom_point(size = 3, colour = "chartreuse4")+   #colour all points the same
+  theme_classic(base_size = 12)+
+  ggtitle ("Residual shape component (RSC) 1 vs CAC")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))+
+#confidence intervals and reg line using standard function, difficult to do with external model - to try use  function in allometry plot
+  geom_smooth(method='lm', size = 0.5, colour = "darkseagreen3")
+
 #TWO-BLOCK PLS ----
 #Two-block PLS of allometry, another way to visualize connection between logCS and shape, main one for analyses
 minkeAllometry_pls <- two.b.pls(logCsize, minke_coords,iter = 999) 
@@ -405,7 +491,7 @@ ggplot(minke_pcscores_res, aes(x = Comp1, y = Comp2, label = individuals, colour
   theme(plot.title = element_text(face = "bold", hjust = 0.5))  #title font and position
 
 
-#ANOVA OF GROUP DIFFERENCES  ----
+#ANOVA and PROCUSTES VARIANCES OF GROUP DIFFERENCES  ----
 #Create dataframe to operate more easily - use allometry residuals
 minke_dataframe <- geomorph.data.frame(minkeAllometry_residuals, gp = minke_age_tibble$age) 
 
@@ -422,6 +508,11 @@ par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
 age_anova_diagnostics <- plot(minke_age_anova,type = "diagnostics",
                                   cex = 1.2, font.main = 2)
 par(init)                     #restore initial plot parameters (1 plot showing at a time)
+
+
+##Morphological disparity - calculate Procrustes variances and distances between groups
+morphol.disparity(coords ~ 1, groups = NULL, data = gdf, 
+                  iter = 999, print.progress = FALSE)
 
 
 
