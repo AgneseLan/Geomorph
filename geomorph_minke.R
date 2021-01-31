@@ -194,38 +194,34 @@ minke_pcscores_all_tibble <- minke_pcscores_all_tibble %>% mutate(individuals = 
 glimpse(minke_pcscores_all_tibble)
 
 #Create data frame with line parameters from regression
-#Allows to show a line on PC plot with specimens colored IF manual numbers are instead instead of using data frame or tibble
-PC1_reg_line <- data.frame(int = PC1_size_reg[["coefficients"]][["(Intercept)"]], slope = PC1_size_reg[["coefficients"]][["size"]])
-PC1_reg_line
+#Allows to show a line on PC plot with specimens colored IF col and other graphics OUTSIDE of aes()!!!
+PC_reg_line <- data.frame(int1 = PC1_size_reg[["coefficients"]][["(Intercept)"]], slope1 = PC1_size_reg[["coefficients"]][["size"]], #PC1 values
+                          int2 = PC2_size_reg[["coefficients"]][["(Intercept)"]], slope2 = PC2_size_reg[["coefficients"]][["size"]]) #PC2 values
+PC_reg_line
 
-#Nice plot with specimens colored by age and line - no title
+#Nice plot with specimens colored by age AND regression line with confidence intervals
 ggplot(minke_pcscores_all_tibble, aes(x = size, y = Comp1, label = individuals, colour = age))+
+  #line on plot
+  geom_abline(data = PC_reg_line, aes(intercept = int1, slope = slope1), colour = "darkblue", size = 0.8, linetype = "dashed", show.legend = FALSE)+
   geom_point(size = 3)+
   scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
                       values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
   theme_classic(base_size = 12)+
   xlab("logCS")+
   ylab("PC 1 (48.89%)")+
-#line on plot, can change graphical paramters IF not a separate dataset
-  geom_abline(intercept = 0.5375881, slope = -0.1930502, colour = "blue", size = 1, linetype = "dashed", show.legend = FALSE)+ 
   geom_text_repel(colour = "black", size = 3.5)
 
 #Repeat for other component
-#Create data frame with line parameters from regression
-#Allows to show a line on PC plot with specimens colored IF manual numbers are instead instead of using data frame or tibble
-PC2_reg_line <- data.frame(int = PC2_size_reg[["coefficients"]][["(Intercept)"]], slope = PC2_size_reg[["coefficients"]][["size"]])
-PC2_reg_line
-
-#Nice plot with specimens colored by age and line - no title
+#Nice plot with specimens colored by age AND regression line with confidence intervals
 ggplot(minke_pcscores_all_tibble, aes(x = size, y = Comp2, label = individuals, colour = age))+
+  #line on plot
+  geom_abline(data = PC_reg_line, aes(intercept = int2, slope = slope2), colour = "darkblue", size = 0.8, linetype = "dashed", show.legend = FALSE)+
   geom_point(size = 3)+
   scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
                       values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
   theme_classic(base_size = 12)+
   xlab("logCS")+
   ylab("PC 2 (22.17%)")+
-  #line on plot, can change graphical parameters IF not a separate dataset
-  geom_abline(intercept = -0.1794482, slope = 0.06444064, colour = "blue", size = 1, linetype = "dashed", show.legend = FALSE)+ 
   geom_text_repel(colour = "black", size = 3.5)
 
 
@@ -296,17 +292,6 @@ View(minkeAllometry_plot)
 minkeAllometry_plot <- minkeAllometry_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
 glimpse(minkeAllometry_plot)
 
-#Nice plot with specimens colored by age
-ggplot(minkeAllometry_plot, aes(x = logCS, y = RegScores, label = individuals, colour = age))+
-  geom_point(size = 3)+
-  geom_text_repel(colour = "black", size = 3.5)+
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
-  theme_classic(base_size = 12)+
-  ylab("Regression Score")+
-  ggtitle ("Shape vs logCS")+
-  theme(plot.title = element_text(face = "bold", hjust = 0.5))
-
 ##Add regression line with confidence intervals
 #Make data frame of data for confidence intervals
 conf_intervals <- data.frame(newX, newY)
@@ -322,17 +307,20 @@ glimpse(conf_intervals)
 conf_intervals <- conf_intervals %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
 glimpse(conf_intervals)
 
-#Nice plot with regression line and confidence intervals - do not color by age or it will mess it up
-ggplot(minkeAllometry_plot, aes(x = logCS, y = RegScores, label = individuals))+
-  geom_point(size = 3, colour = "chartreuse4")+   #colour all points the same
+#Nice plot with specimens colored by age AND regression line with confidence intervals
+ggplot(minkeAllometry_plot, aes(x = logCS, y = RegScores, label = individuals, colour = age))+
+  geom_smooth(data = conf_intervals, aes(ymin = lwr, ymax = upr), stat = 'identity',          #confidence intervals and reg line, before points
+              colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+      #put col and other graphics OUTSIDE of aes()!!!
+  geom_point(size = 3)+       #points after, so they are on top
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
   theme_classic(base_size = 12)+
   ylab("Regression Score")+
   ggtitle ("Shape vs logCS")+
   theme(plot.title = element_text(face = "bold", hjust = 0.5))+
-  geom_smooth(data = conf_intervals, aes(ymin = lwr, ymax = upr), stat = 'identity',     #confidence intervals and reg line
-              colour = "darkseagreen3", fill = 'gainsboro')+                             #line colour and interval fill
   geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
-                  force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance)
+                  force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance) 
+
 
 #PC1 values vs logCS - regression method with prediction line plotting
 allometryplot_regline <- plot(minkeAllometry_log,type = "regression",predictor = logCsize, reg.type = "PredLine",
@@ -393,29 +381,25 @@ glimpse(conf_intervals_CAC)
 conf_intervals_CAC <- conf_intervals_CAC %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
 glimpse(conf_intervals_CAC)
 
-#Nice plot with specimens colored by age - no labels
+#Nice plot with specimens colored by age AND regression line with confidence intervals  - no labels
 ggplot(minkeAllometry_CAC_plot, aes(x = logCS, y = CAC, label = individuals, colour = age))+
-  geom_point(size = 3)+
+  geom_smooth(data = conf_intervals_CAC, aes(ymin = lwr, ymax = upr), stat = 'identity',          #confidence intervals and reg line, before points
+              colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+      #put col and other graphics OUTSIDE of aes()!!!
+  geom_point(size = 3)+       #points after, so they are on top
   scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
                       values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
   theme_classic(base_size = 12)+
   ggtitle ("CAC vs logCS")+
   theme(plot.title = element_text(face = "bold", hjust = 0.5))
 
-#Nice plot with regression line and confidence intervals - no labels - do not color by age or it will mess it up
-ggplot(minkeAllometry_CAC_plot, aes(x = logCS, y = CAC, label = individuals))+
-  geom_point(size = 3, colour = "chartreuse4")+   #colour all points the same
-  theme_classic(base_size = 12)+
-  ggtitle ("CAC vs logCS")+
-  theme(plot.title = element_text(face = "bold", hjust = 0.5))+
-  geom_smooth(data = conf_intervals_CAC, aes(ymin = lwr, ymax = upr), stat = 'identity',     #confidence intervals and reg line
-              colour = "darkseagreen3", fill = 'gainsboro')                            #line colour and interval fill
-  
 #Plot B
-#Confidence intervals and reg line using standard function, difficult to do with external model - residuals too small
 
 #Nice plot with specimens colored by age - no labels
-ggplot(minkeAllometry_CAC_plot, aes(x = CAC, y = RSC1, label = individuals, colour = age))+
+ggplot(minkeAllometry_CAC_plot, aes(x = CAC, y = RSC1, colour = age))+
+ #confidence intervals and reg line using standard function, difficult to do with external model for residuals (too small)
+ #see function in CAC plot A for code for external model
+  geom_smooth(method = 'lm',        #confidence intervals and reg line, before points
+              colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.5)+      #put col and other graphics OUTSIDE of aes()!!!
   geom_point(size = 3)+
   scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
                       values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
@@ -423,14 +407,6 @@ ggplot(minkeAllometry_CAC_plot, aes(x = CAC, y = RSC1, label = individuals, colo
   ggtitle ("Residual shape component (RSC) 1 vs CAC")+
   theme(plot.title = element_text(face = "bold", hjust = 0.5))
 
-#Nice plot with regression line and confidence intervals - no labels - do not color by age or it will mess it up
-ggplot(minkeAllometry_CAC_plot, aes(x = CAC, y = RSC1, label = individuals))+
-  geom_point(size = 3, colour = "chartreuse4")+   #colour all points the same
-  theme_classic(base_size = 12)+
-  ggtitle ("Residual shape component (RSC) 1 vs CAC")+
-  theme(plot.title = element_text(face = "bold", hjust = 0.5))+
-#confidence intervals and reg line using standard function, difficult to do with external model - to try use  function in allometry plot
-  geom_smooth(method='lm', size = 0.5, colour = "darkseagreen3")
 
 #TWO-BLOCK PLS ----
 #Two-block PLS of allometry, another way to visualize connection between logCS and shape, main one for analyses
@@ -462,8 +438,11 @@ View(minkeAllometry_pls_plot)
 minkeAllometry_pls_plot <- minkeAllometry_pls_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
 glimpse(minkeAllometry_pls_plot)
 
-#Nice plot with specimens colored by age
+#Nice plot with specimens colored by age AND regression line with confidence intervals
 ggplot(minkeAllometry_pls_plot, aes(x = block1, y = block2, label = individuals, colour = age))+
+#confidence intervals and reg line, before points  
+  geom_smooth(method='lm',     #use standard function, values too small    
+              colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+  
   geom_point(size = 3)+
   geom_text_repel(colour = "black", size = 3.5)+
   scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
@@ -474,19 +453,6 @@ ggplot(minkeAllometry_pls_plot, aes(x = block1, y = block2, label = individuals,
   ggtitle ("PLS1 plot: Block 1 (logCS) vs Block 2 (Shape)")+
   theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))
 
-#Nice plot with regression line and confidence intervals - do not color by age or it will mess it up
-ggplot(minkeAllometry_pls_plot, aes(x = block1, y = block2, label = individuals))+
-  geom_point(size = 3, colour = "chartreuse4")+   #colour all points the same
-  theme_classic(base_size = 12)+
-  xlab("PLS1 Block 1: logCS")+
-  ylab("PLS1 Block 2: Shape")+
-  ggtitle ("PLS1 plot: Block 1 (logCS) vs Block 2 (Shape)")+
-  theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))+
-#confidence intervals and reg line using standard function, difficult to do with external model - to try use  function in allometry plot
-  geom_smooth(method='lm', colour = "darkseagreen3", fill = 'gainsboro')+   
-  geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
-                  force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance)
-  
 
 #PCA ALLOMETRY RESIDUALS ----
 #New PCA plot with data corrected for allometry
@@ -642,13 +608,13 @@ ggplot(trajectory_pcscores, aes(x = PC1, y = PC2, colour = age))+
  #add trajectory lines, one line for each, write column name and row number form tibble
   geom_segment(data = trajectory_pcscores_means, aes(x = x[4], y = y[4], #neonate
                    xend = x[1], yend = y[1]),  #adult 
-                   arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+  #add arrow at end
+                   colour = "gray35", size = 0.8, linejoin = 'mitre', arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+  #add arrow at end
   geom_segment(data = trajectory_pcscores_means, aes(x = x[3], y = y[3], #lateF
                                                      xend = x[4], yend = y[4], colour = age), #neonate
-             arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+
+               colour = "gray35", size = 0.8, linejoin = 'mitre', arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+
   geom_segment(data = trajectory_pcscores_means, aes(x = x[2], y = y[2],  #earlyF
                                                      xend =  x[3], yend = y[3], colour = age), #lateF
-                arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))
+               colour = "gray35", size = 0.8, linejoin = 'mitre', arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))
   
 
 #SYMMETRY ANALYSIS ----
@@ -838,23 +804,51 @@ summary(modularity_test)
 plot(modularity_test)
 
 ##Make better histogram plot with ggplot
-#Create tibble with modularity analysis values
-modularity_plot <- data.frame(CR = modularity_test[["CR.boot"]])
-modularity_plot <- as_tibble(modularity_plot )
 #Save CR of data as object
 CRdata <- modularity_test[["CR"]]
 
-#Calculate mean of observation for arrow
-mean_CR <- modularity_plot %>% summarize(mean = mean(CR))
-mean_CR <- data.frame(mean_CR)
+#Save all generated CRs as object
+CR <- modularity_test[["CR.boot"]]
 
-#Nice plot
+#Calculate mean of CRs for arrow
+mean_CR <- mean(CR)
+
+#Create tibble with modularity analysis values
+modularity_plot <- data.frame(CR)
+modularity_plot <- as_tibble(modularity_plot )
+glimpse(modularity_plot)
+
+#Make simple histogram plot as object to obtain counts per bin with given bin width (try to see if binwidth value appropiate)
+plot1 <- ggplot(modularity_plot, aes(CR))+
+  geom_histogram(binwidth = 0.01, fill = "azure2", colour = "azure4")
+plot1
+
+#Create data frame with plot variables
+plot2 <- ggplot_build(plot1)  
+
+#Save only data counts as tibble
+plot2_data <- plot2[["data"]][[1]]
+plot2_data <- plot2_data[,1:5]
+plot2_data <- as_tibble(plot2_data)
+
+#Filter rows to select row with count for CR data and mean CR 
+count_CRdata <- plot2_data %>% filter(xmin <= CRdata, xmax >= CRdata)
+count_meanCR <- plot2_data %>% filter(xmin <= mean_CR, xmax >= mean_CR)
+
+#Create tibble with x and y columns to build arrows - x = mean position on bin, y = starting position on bin
+arrow_plot <- data.frame(x_data = count_CRdata$x, y_data = count_CRdata$y, x_mean = count_meanCR$x, y_mean = count_meanCR$y)
+arrow_plot <- as_tibble(arrow_plot)
+glimpse(arrow_plot)
+
+#Nice plot  
 ggplot(modularity_plot, aes(CR))+
   geom_histogram(binwidth = 0.01, fill = "azure2", colour = "azure4")+
-  geom_segment(aes(x = 0.8817763, xend = 0.8817763, y = 34, yend = 43, colour = "firebrick4"),
-               arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "first", type = "closed"))+
-  geom_segment(aes(x = 0.9444502, xend = 0.9444502, y = 45, yend = 54, colour = "black"),
-               arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "first", type = "closed"))+
+ #add arrow for CR data
+  geom_segment(data = arrow_plot, aes(x = x_data, xend = x_data, y = y_data, yend = y_data + 10, colour = "firebrick4"), size = 1.1,
+               arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "first", type = "closed"), linejoin = 'mitre')+
+ #add arrow for mean CR 
+  geom_segment(data = arrow_plot, aes(x = x_mean, xend = x_mean, y = y_mean, yend = y_mean + 10, colour = "black"), size = 1.1,
+               arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "first", type = "closed"), linejoin = 'mitre')+
   scale_colour_manual(name = NULL, labels = c("CR data", "mean CR"), 
                       values = c("firebrick4","black"))+            #legend and color adjustments
   theme_minimal()+
@@ -893,8 +887,11 @@ glimpse(modules_pls_plot)
 modules_pls_plot <- modules_pls_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
 glimpse(modules_pls_plot)
 
-#Nice plot with specimens colored by age
+#Nice plot with specimens colored by age AND regression line with confidence intervals
 ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = individuals, colour = age))+
+  #confidence intervals and reg line, before points  
+  geom_smooth(method='lm',     #use standard function, values too small    
+              colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+  
   geom_point(size = 3)+
   geom_text_repel(colour = "black", size = 3.5)+
   scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
@@ -905,20 +902,7 @@ ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = ind
   ggtitle ("PLS1 plot: Block 1 (rostrum) vs Block 2 (braincase)")+
   theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))
 
-#Nice plot with regression line and confidence intervals - do not color by age or it will mess it up
-ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = individuals))+
-  geom_point(size = 3, colour = "darkgoldenrod2")+   #colour all points the same
-  theme_classic(base_size = 12)+
-  xlab("PLS1 Block 1: rostrum")+
-  ylab("PLS1 Block 1: braincase")+
-  ggtitle ("PLS1 plot: Block 1 (rostrum) vs Block 2 (braincase)")+
-  theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))+
- #confidence intervals and reg line using standard function, difficult to do with external model - to try use  function in allometry plot
-  geom_smooth(method='lm', colour = "khaki3", fill = 'gainsboro')+   
-  geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
-                  force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance)
-
-#Use this to save points represneting extremes of deformation - not very good graphics
+#Use this to save points representing extremes of deformation - not very good graphics
 picknplot.shape(modulesplot_pls, label = TRUE, mag = 0.5)
 
 #Might be possible to improve using shape.predictor and plotRefToTarget BUT different mesh needed for each module and need to find new data coordinates
