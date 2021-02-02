@@ -1,3 +1,6 @@
+## GEOMORPH EXAMPLE CODE ##
+
+#LOAD LIBRARIES ----
 #always do this first!!
 library(geomorph) 
 library(geiger)
@@ -866,8 +869,8 @@ integration_test <- integration.test(minkeAllometry_residuals, partition.gp = mo
 summary(integration_test) 
 
 #PLS plot of the two modules - two-block PLS with regression line
-modulesplot_pls <- plot(integration_test,
-                        pch = 21, col = "darkgoldenrod2", bg = "darkgoldenrod2", cex = 1.2) 
+modulesplot_pls <- plot(integration_test, 
+                        pch = 21, col = "darkgoldenrod2", bg = "darkgoldenrod2", cex = 1.2, ) 
 #Save plot arguments as objects to use in plots
 block1_modules <- modulesplot_pls$plot.args$x
 block2_modules <- modulesplot_pls$plot.args$y
@@ -906,6 +909,65 @@ ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = ind
 picknplot.shape(modulesplot_pls, label = TRUE, mag = 0.5)
 
 #Might be possible to improve using shape.predictor and plotRefToTarget BUT different mesh needed for each module and need to find new data coordinates
+
+#FINISH CODE!!
+block1_shapes <- modulesplot_pls$A1
+block2_shapes <- modulesplot_pls$A2
+
+block1_mean_shape <- mshape(modulesplot_pls$A1)
+block2_mean_shape <- mshape(modulesplot_pls$A2)
+
+PLSblock1 <- shape.predictor(block1_shapes, 
+                         x = block1_modules, 
+                         Intercept = FALSE,  
+                         method = "PLS",
+                         min = min(block1_modules), 
+                         max = max(block1_modules))
+# block 2 -0.07713898 0.1260611
+
+
+
+plotRefToTarget(block1_mean_shape, PLSblock1$min, mag = 2, method = "TPS")
+
+
+plotRefToTarget(block1_mean_shape, PLSblock1$max, mag = 2, method = "TPS")
+
+#Extract coordinates from mean_spec based on modules vector function and create 2 separte mean shapes
+mean_spec[7,]
+
+
+#Import simplified meshes to create warp mesh on
+minke_skull3D <- read.ply("Data/simpleskull.ply") #make sure NO binary encoding (ASCII)
+
+#Check range of mesh and coordinates to make sure it has same scale
+range(minke_skull3D$vb[1:3,]) #if this is too big/small, scale in editor and re-import
+range(mean_spec)
+
+##Create warp meshes, to use as reference for visualization of analyses
+ref_mesh <- warpRefMesh(mesh = minke_skull3D, mesh.coord = mean_spec, ref = mean_shape, color = NULL, centered = FALSE) 
+
+#Show deformation grids on axis from mean shape, do this for all 4 extremes - "TPS" method
+plotRefToTarget(mean_shape_res, PC1min_res, method = "TPS", mag = 1, label = FALSE)  #save image
+
+#Show 3D deformation from mean with points overlay, do this for all 4 extremes - "points" method
+plotRefToTarget(mean_shape_res, PC1min_res, method = "points", mag = 1, label = FALSE)   #save as HTML
+
+#Show 3D deformation from mean with vectors, do this for all 4 extremes - "vector" method
+plotRefToTarget(mean_shape_res, PC1min_res, method = "vector", mag = 1, label = FALSE)   #save as screenshot
+
+#Show 3D deformation from mean by warping 3D mesh, do this for all 4 extremes - "surface" method
+plotRefToTarget(mean_shape_res, PC1min_res, mesh = ref_mesh, method = "surface", mag = 1, label = FALSE)   #save as HTML
+
+##3D windows save
+#Save screenshot of 3D window, useful for lateral and dorsal views - use screen snip if it fails
+rgl.snapshot(filename = "Output/X.png") 
+#Save 3D window as html file - 3D widget
+PC1min <- scene3d()
+widget <- rglwidget()
+filename <- tempfile(fileext = ".html")
+htmlwidgets::saveWidget(rglwidget(), filename)
+browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
+
 
 #GROUP MEANS FOR PHYLOGENTIC/AGE ANALYSIS ----
 trees<-"trees_age.nex" #Add trees in Nexus format
