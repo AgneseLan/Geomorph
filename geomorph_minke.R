@@ -9,7 +9,8 @@ library(ggplot2)
 library(tidyr)
 library(tidyverse)
 library(ggrepel)
-
+library(gginnards)
+library(ggphylomorpho)
 
 #DATA IMPORT AND PREP ----
 
@@ -1011,29 +1012,6 @@ spec_trees <- read.nexus(trees2)
 plot(spec_trees)
 View(spec_trees)
 
-#Create mean shape for each group based on classifiers
-age_means <- aggregate(two.d.array(minke_coords) ~ minke_age, FUN = mean) #use original shapes, NOT allometric correction
-
-#Set row names that match tree labels
-rownames(age_means) <- c("adult","earlyFetus","lateFetus","neonate") 
-age_means
-
-#Transform in matrix and exclude columns that do not contain coordinates
-age_means <- as.matrix(age_means[,-1]) 
-#Transform in 3D array
-age_means <- arrayspecs(age_means,16,3) 
-
-#Mean logCS size based on groups
-logCsize_age_means <- aggregate(logCsize ~ minke_age, FUN = mean) 
-
-#Set row names that match tree labels
-rownames(logCsize_age_means) <- c("adult","earlyFetus","lateFetus","neonate") 
-
-#Eliminate first column with names of classifiers
-logCsize_age_means <- select(logCsize_age_means,-"minke_age") 
-
-#Make numeric
-logCsize_age_means <- as.matrix(logCsize_age_means) 
 
 ##Phylomorphospace
 #Simple phylogeny projected on morphospace, no calculations
@@ -1064,6 +1042,88 @@ filename <- tempfile(fileext = ".html")
 htmlwidgets::saveWidget(rglwidget(), filename)
 browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
 
+##Test for phylogenetic signal in shape residuals
+phylo_signal1 <- physignal(minkeAllometry_residuals,phy = spec_trees$age2, iter = 999)
+phylo_signal2 <- physignal(minkeAllometry_residuals,phy = spec_trees$age4, iter = 999)
+
+#View results
+summary(phylo_signal1)
+summary(phylo_signal2)
+
+#Histogram of phylogenetic signal
+plot(phylo_signal1)
+plot(phylo_signal2)
+
+##Make better histogram plot with ggplot (phylo_signal1 as example)
+#Save phylo signal K of data as object
+K1data <- phylo_signal1[["phy.signal"]]
+
+#Save random Ks phylo signals as object
+K1 <- phylo_signal1[["random.K"]]
+
+#Calculate mean of Ks for arrow
+meanK1 <- mean(K1)
+
+#Create tibble with phylogentic signal analysis values
+phylo_signal1_plot <- data.frame(K1)
+phylo_signal1_plot <- as_tibble(phylo_signal1_plot)
+glimpse(phylo_signal1_plot)
+
+#Make simple histogram plot as object to obtain counts per bin with given bin width (try to see if binwidth value appropiate)
+plot1 <- ggplot(phylo_signal1_plot, aes(K1))+
+  geom_histogram(binwidth = 0.01, fill = "azure2", colour = "azure4")
+plot1
+
+#Create data frame with plot variables
+plot2 <- ggplot_build(plot1)  
+
+#Save only data counts as tibble
+plot2_data <- plot2[["data"]][[1]]
+plot2_data <- plot2_data[,1:5]
+plot2_data <- as_tibble(plot2_data)
+glimpse(plot2_data)
+
+#Filter rows to select row with count for CR data and mean CR 
+count_K1data <- plot2_data %>% filter(xmin <= K1data, xmax >= K1data)
+count_meanK1 <- plot2_data %>% filter(xmin <= meanK1, xmax >= meanK1)
+
+#Create tibble with x and y columns to build arrows - x = mean position on bin, y = starting position on bin
+arrow_plot <- data.frame(x_data = count_K1data$x, y_data = count_K1data$y, x_mean = count_meanK1$x, y_mean = count_meanK1$y)
+arrow_plot <- as_tibble(arrow_plot)
+glimpse(arrow_plot)
+
+#Nice plot  
+ggplot(phylo_signal1_plot, aes(K1))+
+  geom_histogram(binwidth = 0.01, fill = "azure2", colour = "azure4")+
+  #add arrow for CR data
+  geom_segment(data = arrow_plot, aes(x = x_data, xend = x_data, y = y_data, yend = y_data + 30, colour = "firebrick4"), size = 1,
+               arrow = arrow(angle = 30, length = unit(0.02, "npc"), ends = "first", type = "closed"), linejoin = 'mitre')+
+  #add arrow for mean CR 
+  geom_segment(data = arrow_plot, aes(x = x_mean, xend = x_mean, y = y_mean, yend = y_mean + 30, colour = "black"), size = 1,
+               arrow = arrow(angle = 30, length = unit(0.02, "npc"), ends = "first", type = "closed"), linejoin = 'mitre')+
+  scale_colour_manual(name = NULL, labels = c("Observed K", "mean K"), 
+                      values = c("firebrick4","black"))+            #legend and color adjustments
+  theme_minimal()+
+  xlab("Phylogenetic Signal K")+
+  ylab("Frequency")+
+  ggtitle("Phylogentic Signal test - p-value=0.743")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+#Phylogentic signal test for shapes produces PaCa
+##PaCA: Phylogenetically-aligned PCA
+#Projection of phylogenetic signal in the first two components, helps to highlight importance of phylogeny relative to other signals
+PCA_PaCA_spec1 <- phylo_signal1$PACA
+PCA_PaCA_spec2 <- phylo_signal2$PACA
+
+#View results
+summary(PCA_PaCA_spec1)
+summary(PCA_PaCA_spec2)
+
+#Plot PaCa
+plot(PCA_PaCA_spec1, phylo = TRUE, #add phylogeny
+     main = "PaCa", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+plot(PCA_PaCA_spec2, phylo = TRUE, #add phylogeny
+     main = "PaCa", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2)
 
 ##phyloPCA
 #Phylogeny is used to calculate principal components of variation - GLS method
@@ -1081,29 +1141,76 @@ plot(PCA_phylo_spec2, phylo = TRUE, #add phylogeny
      main = "phyloPCA", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
 
 
+##Make better PCA plot using ggplot - phyloPCA
+#Tree 1 as example
+#Save pc scores as object
+pcscores_phylo <- PCA_phylo_spec1[["x"]]
 
-##PaCA: Phylogenetically-aligned PCA
-#Projection of phylogenetic signal in the first two components, helps to highlight importance of phylogeny relative to other signals
-PCA_PaCA_spec1 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age2, align.to.phy = TRUE)
-PCA_PaCA_spec2 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age4, align.to.phy = TRUE)
+#Read PC scores as tibble
+pcscores_phylo  <- as_tibble(pcscores_phylo)
+glimpse(pcscores_phylo )
+#Add labels and other attributes to tibble as columns
+pcscores_phylo  <- pcscores_phylo  %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(pcscores_phylo)
 
-#View results
-summary(PCA_PaCA_spec1)
-summary(PCA_PaCA_spec2)
+##Order tibble by avariable e.g. age
+#Make factor for variable
+pcscores_phylo$age <- factor(pcscores_phylo$age, levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+pcscores_phylo <- pcscores_phylo[order(pcscores_phylo$age),]
+glimpse(pcscores_phylo)
 
-#Plot PCA
-plot(PCA_PaCA_spec1, phylo = TRUE, #add phylogeny
-     main = "PaCa", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
-plot(PCA_PaCA_spec2, phylo = TRUE, #add phylogeny
-     main = "PaCa", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+#Use package ggphylomorpho to create a first phylomorphospace plot
+PCA_phylo_plot <- ggphylomorpho(tree = spec_trees$age2, tipinfo = pcscores_phylo, 
+                                xvar = Comp1, yvar = Comp2, 
+                                factorvar = age, labelvar = individuals, tree.alpha = 0.7)
+PCA_phylo_plot
+
+#Using the package gginnards, remove the GeomPoint (points on tips) and GeomTextRepel (labels) so you just have the tree network
+PCA_phylo_plot <- PCA_phylo_plot %>%
+  delete_layers("GeomPoint") %>%
+  delete_layers("GeomTextRepel")
+
+#Create convex hulls - polygons that include all specimens that belong to a group
+hull_age <- pcscores_phylo %>%
+  group_by(age) %>%
+  slice(chull(Comp1, Comp2)) %>%
+  rename(x = Comp1) %>%
+  rename(y = Comp2)
+glimpse(hull_age)
+
+pcscores_phylo %>%
+  group_by(age)%>%
+slice(chull(Comp1, Comp2)) 
 
 
-#Add code for GGplot graphics
+#Nice plot with phylogeny + convex hulls
+PCA_phylo_plot + 
+  geom_point(data = pcscores_phylo, aes(x = Comp1, y = Comp2, colour = age), size = 3)+ #add shape =  to aes to change shapes based on groups
+  #Add convex hulls
+  geom_polygon(data = hull_age, aes(x = x, y = y, fill = age), alpha = .5, show.legend = FALSE)+ #alpha = transparency of colour
+#Add labels  
+  geom_text_repel(data = pcscores_phylo, aes(x = Comp1, y = Comp2, label = individuals, size = 3.5), show.legend = FALSE)+
+#Colour points and convex hulls
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), #to be ordered as they appear in tibble
+                      values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+            #legend and color adjustments
+  scale_fill_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"),
+                    values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+
+  theme_bw()+
+  ggtitle("phylo PCA by age")+
+  theme(legend.title = element_text(face="bold"), #Legend titles in bold
+        legend.justification = "top")+ #Legend position
+  xlab("PC 1 (41.92%)")+ #copy this from standard PCA plot
+  ylab("PC 2 (27.47%)")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))  #title font and position
 
+#Code to remove dots from legend
+  guides(fill = guide_legend(override.aes = list(shape = NA)))+  #remove annoying dots in the colour legend
+#Code to decide which polygons are sued for each group if shape = present
+scale_shape_manual(values=c(17, 18, 15)) 
+  
 
-
-
-#ALLOMETRY ANALYSIS BY GROUP ----
+#ALLOMETRY ANALYSIS BY GROUP AND GROUP MEANS ----
 minkeAllometry_log_age <- procD.lm(minke_coords ~ logCsize * minke_age, iter=999, print.progress = TRUE) 
 View(minkeAllometry_log_age)
 
@@ -1188,5 +1295,27 @@ ggplot(minkeAllometry_plot_age, aes(x = logCS, y = RegScores, label = individual
   geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
                   force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance) 
 
+##Group means - can be useful if I have multiple specimens of 1 species to plot
+#Create mean shape for each group based on classifiers
+age_means <- aggregate(two.d.array(minke_coords) ~ minke_age, FUN = mean)
 
+#Set row names that match tree labels
+rownames(age_means) <- c("adult","earlyFetus","lateFetus","neonate") 
+age_means
 
+#Transform in matrix and exclude columns that do not contain coordinates
+age_means <- as.matrix(age_means[,-1]) 
+#Transform in 3D array
+age_means <- arrayspecs(age_means,16,3) 
+
+#Mean logCS size based on groups
+logCsize_age_means <- aggregate(logCsize ~ minke_age, FUN = mean) 
+
+#Set row names that match tree labels
+rownames(logCsize_age_means) <- c("adult","earlyFetus","lateFetus","neonate") 
+
+#Eliminate first column with names of classifiers
+logCsize_age_means <- select(logCsize_age_means,-"minke_age") 
+
+#Make numeric
+logCsize_age_means <- as.matrix(logCsize_age_means) 
