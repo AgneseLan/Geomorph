@@ -998,24 +998,107 @@ ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = ind
   theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))
 
 
-#GROUP MEANS FOR PHYLOGENTIC/AGE ANALYSIS ----
+#PHYLOGENTIC/AGE ANALYSIS ----
 
-trees<-"trees_age.nex" #Add trees in Nexus format
+#Import trees in Nexus format - branch lenghts needed!!
+trees <- "Data/trees_age_2.nex" 
+trees2 <- "Data/trees_age.nex"
 
-agetrees<-read.nexus(trees) #Read the trees for analysis
+#Read the trees for analysis
+age_trees <- read.nexus(trees) 
+plot(age_trees)
+View(age_trees)
+spec_trees <- read.nexus(trees2)
+plot(spec_trees)
+View(spec_trees)
 
-means <- aggregate(two.d.array(minke.shape.all)~ classifiers, FUN=mean) #Create mean shape for each group based on classifiers
+#Create mean shape for each group based on classifiers
+age_means <- aggregate(two.d.array(minke_coords) ~ minke_age, FUN = mean) #use original shapes, NOT allometric correction
 
-rownames(means) <- c("adult","earlyFetus","lateFetus","neonate") #Set row names that match tree labels
+#Set row names that match tree labels
+rownames(age_means) <- c("adult","earlyFetus","lateFetus","neonate") 
+age_means
 
-means.age <- as.matrix(means[,-(1)]) #Transform in matrix and exclude columns that do not contain coordinates
+#Transform in matrix and exclude columns that do not contain coordinates
+age_means <- as.matrix(age_means[,-1]) 
+#Transform in 3D array
+age_means <- arrayspecs(age_means,16,3) 
 
-means.age<-arrayspecs(means.age,16,3) #Transform in 3D array as whole data
+#Mean logCS size based on groups
+logCsize_age_means <- aggregate(logCsize ~ minke_age, FUN = mean) 
 
-means.CS<-aggregate(logCSsize~ classifiers, FUN=mean) #Mean CS size based on groups
+#Set row names that match tree labels
+rownames(logCsize_age_means) <- c("adult","earlyFetus","lateFetus","neonate") 
 
-rownames(means.CS) <- c("adult","earlyFetus","lateFetus","neonate") #Set row names that match tree labels
+#Eliminate first column with names of classifiers
+logCsize_age_means <- select(logCsize_age_means,-"minke_age") 
 
-means.CS.age<-select(means.CS,-"classifiers") #Eliminate first column with names of classifiers
+#Make numeric
+logCsize_age_means <- as.matrix(logCsize_age_means) 
 
-means.CS.age<-as.matrix(means.CS.age) #Make numeric
+##Phylomorphospace
+#Simple phylogeny projected on morphospace, no calculations
+PCA_phylomor_spec1 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age2)
+PCA_phylomor_spec2 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age4)
+
+#View results
+summary(PCA_phylomor_spec1)
+summary(PCA_phylomor_spec2)
+
+#Plot PCA
+plot(PCA_phylomor_spec1, phylo = TRUE, #add phylogeny
+     main = "PCA phylomorphospace",  pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+plot(PCA_phylomor_spec2, phylo = TRUE, #add phylogeny
+     main = "PCA phylomorphospace",  pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+
+#3D phylo plot
+plot(PCA_phylomor_spec1, time.plot = TRUE, pch = 21, col = "deeppink", bg = "deeppink", cex = 2, 
+     phylo.par = list(edge.color = "grey60", edge.width = 1.5, tip.txt.cex = 0.75,
+                      node.labels = F, anc.states = F))
+##3D windows save
+#Save screenshot of 3D window, useful for lateral and dorsal views - use screen snip if it fails
+rgl.snapshot(filename = "Output/X.png") 
+#Save 3D window as html file - 3D widget
+PCA_3D <- scene3d()
+widget <- rglwidget()
+filename <- tempfile(fileext = ".html")
+htmlwidgets::saveWidget(rglwidget(), filename)
+browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
+
+
+##phyloPCA
+#Phylogeny is used to calculate principal components of variation - GLS method
+PCA_phylo_spec1 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age2, GLS = TRUE)
+PCA_phylo_spec2 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age4, GLS = TRUE)
+
+#View results
+summary(PCA_phylo_spec1)
+summary(PCA_phylo_spec2)
+
+#Plot PCA
+plot(PCA_phylo_spec1, phylo = TRUE, #add phylogeny
+     main = "phyloPCA", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+plot(PCA_phylo_spec2, phylo = TRUE, #add phylogeny
+     main = "phyloPCA", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+
+
+
+##PaCA: Phylogenetically-aligned PCA
+#Projection of phylogenetic signal in the first two components, helps to highlight importance of phylogeny relative to other signals
+PCA_PaCA_spec1 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age2, align.to.phy = TRUE)
+PCA_PaCA_spec2 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age4, align.to.phy = TRUE)
+
+#View results
+summary(PCA_PaCA_spec1)
+summary(PCA_PaCA_spec2)
+
+#Plot PCA
+plot(PCA_PaCA_spec1, phylo = TRUE, #add phylogeny
+     main = "PaCa", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+plot(PCA_PaCA_spec2, phylo = TRUE, #add phylogeny
+     main = "PaCa", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+
+
+
+
+
