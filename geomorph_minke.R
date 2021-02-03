@@ -786,7 +786,7 @@ ggplot(minke_pcscores_sym_res, aes(x = Comp1, y = Comp2, label = individuals, co
   theme(plot.title = element_text(face = "bold", hjust = 0.5))  #title font and position
 
 
-#MODULARITY TEST ----
+#MODULARITY TEST AND INTEGRATION TEST ----
 #Set all landmarks in one module
 modules <- rep('a',16) 
 
@@ -871,12 +871,104 @@ summary(integration_test)
 #PLS plot of the two modules - two-block PLS with regression line
 modulesplot_pls <- plot(integration_test, 
                         pch = 21, col = "darkgoldenrod2", bg = "darkgoldenrod2", cex = 1.2, ) 
+
 #Save plot arguments as objects to use in plots
 block1_modules <- modulesplot_pls$plot.args$x
 block2_modules <- modulesplot_pls$plot.args$y
+
 #Add labels
 text(x = block1_modules, y = block2_modules, labels = minke_ind,
      pos = 3, offset = 0.5, cex = 0.75)   #improve appearance of labels
+
+
+##Obtain shapes of modules at min and max of Block 1 and Block 2 axes
+
+#Quick way to visualize shape changes on axes with interactive plot with "points" method
+picknplot.shape(modulesplot_pls, label = TRUE, mag = 1)
+
+#Better way using shape.predictor and plotReftoTarget - "TPS" and "surface" methods
+#Save for block 1 and block 2 as objects from plot
+block1_shapes <- modulesplot_pls$A1
+block2_shapes <- modulesplot_pls$A2
+
+#Create mean shape for each block
+block1_mean_shape <- mshape(modulesplot_pls$A1)
+block2_mean_shape <- mshape(modulesplot_pls$A2)
+
+#Find specimen closer to mean for each block, useful to create warp mesh
+findMeanSpec(block1_shapes)
+findMeanSpec(block2_shapes)
+
+#Create object containing only that specimen coordinates
+block1_mean_spec <- block1_shapes[,,6]
+block2_mean_spec <- block2_shapes[,,12]
+
+#Import reference meshes for each block to use in surface method - parts of original reference mesh
+block1_3D <- read.ply("Data/simpleskull_block1_rostrum.ply") #make sure NO binary encoding (ASCII)
+block2_3D <- read.ply("Data/simpleskull_block2_braincase.ply") #make sure NO binary encoding (ASCII)
+
+#Check range of mesh and coordinates to make sure it has same scale
+range(block1_3D$vb[1:3,]) #if this is too big/small, scale in editor and re-import
+range(block1_mean_spec)
+range(block2_3D$vb[1:3,]) #if this is too big/small, scale in editor and re-import
+range(block2_mean_spec)
+
+#Create warp meshes, to use as reference for visualization of analyses
+block1_ref_mesh <- warpRefMesh(mesh = block1_3D, mesh.coord = block1_mean_spec, ref = block1_mean_shape, color = NULL, centered = FALSE) 
+block2_ref_mesh <- warpRefMesh(mesh = block2_3D, mesh.coord = block2_mean_spec, ref = block2_mean_shape, color = NULL, centered = FALSE) 
+
+##Use shape predictor to generate shape coordinate at min and max of each block 
+block1_shape_pred <- shape.predictor(block1_shapes, #shapes of block
+                             x = block1_modules, #values of axis form plot
+                             Intercept = FALSE,  
+                             method = "PLS",  #since it's the results of a PLS method
+                             min = min(block1_modules), #min value of axis
+                             max = max(block1_modules)) #max value of axis
+
+#Show deformation grids on axis from mean shape, do this for all 4 extremes - "TPS" method
+plotRefToTarget(block1_mean_shape, block1_shape_pred$min, mag = 1, method = "TPS") #save image
+plotRefToTarget(block1_mean_shape, block1_shape_pred$max, mag = 1, method = "TPS") #save image
+
+#Show 3D deformation from mean by warping 3D mesh, do this for all 4 extremes - "surface" method
+plotRefToTarget(block1_mean_shape, block1_shape_pred$min, mesh = block1_ref_mesh, method = "surface", mag = 1)   #save as HTML
+plotRefToTarget(block1_mean_shape, block1_shape_pred$max, mesh = block1_ref_mesh, method = "surface", mag = 1)   #save as HTML
+
+##3D windows save
+#Save screenshot of 3D window, useful for lateral and dorsal views - use screen snip if it fails
+rgl.snapshot(filename = "Output/X.png") 
+#Save 3D window as html file - 3D widget
+block1_pred <- scene3d()
+widget <- rglwidget()
+filename <- tempfile(fileext = ".html")
+htmlwidgets::saveWidget(rglwidget(), filename)
+browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
+
+#Repeat for other block
+block2_shape_pred <- shape.predictor(block2_shapes, #shapes of block
+                                     x = block2_modules, #values of axis form plot
+                                     Intercept = FALSE,  
+                                     method = "PLS",  #since it's the results of a PLS method
+                                     min = min(block2_modules), #min value of axis
+                                     max = max(block2_modules)) #max value of axis
+
+#Show deformation grids on axis from mean shape, do this for all 4 extremes - "TPS" method
+plotRefToTarget(block2_mean_shape, block2_shape_pred$min, mag = 1, method = "TPS") #save image
+plotRefToTarget(block2_mean_shape, block2_shape_pred$max, mag = 1, method = "TPS") #save image
+
+#Show 3D deformation from mean by warping 3D mesh, do this for all 4 extremes - "surface" method
+plotRefToTarget(block2_mean_shape, block2_shape_pred$min, mesh = block2_ref_mesh, method = "surface", mag = 1)   #save as HTML
+plotRefToTarget(block2_mean_shape, block2_shape_pred$max, mesh = block2_ref_mesh, method = "surface", mag = 1)   #save as HTML
+
+##3D windows save
+#Save screenshot of 3D window, useful for lateral and dorsal views - use screen snip if it fails
+rgl.snapshot(filename = "Output/X.png") 
+#Save 3D window as html file - 3D widget
+block2_pred <- scene3d()
+widget <- rglwidget()
+filename <- tempfile(fileext = ".html")
+htmlwidgets::saveWidget(rglwidget(), filename)
+browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
+
 
 ##Make better PLS plot with ggplot
 #Create data frame object that ggplot can read - use data from plot object you want to improve
@@ -905,78 +997,25 @@ ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = ind
   ggtitle ("PLS1 plot: Block 1 (rostrum) vs Block 2 (braincase)")+
   theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))
 
-#Use this to save points representing extremes of deformation - not very good graphics
-picknplot.shape(modulesplot_pls, label = TRUE, mag = 0.5)
-
-#Might be possible to improve using shape.predictor and plotRefToTarget BUT different mesh needed for each module and need to find new data coordinates
-
-#FINISH CODE!!
-block1_shapes <- modulesplot_pls$A1
-block2_shapes <- modulesplot_pls$A2
-
-block1_mean_shape <- mshape(modulesplot_pls$A1)
-block2_mean_shape <- mshape(modulesplot_pls$A2)
-
-PLSblock1 <- shape.predictor(block1_shapes, 
-                         x = block1_modules, 
-                         Intercept = FALSE,  
-                         method = "PLS",
-                         min = min(block1_modules), 
-                         max = max(block1_modules))
-# block 2 -0.07713898 0.1260611
-
-
-
-plotRefToTarget(block1_mean_shape, PLSblock1$min, mag = 2, method = "TPS")
-
-
-plotRefToTarget(block1_mean_shape, PLSblock1$max, mag = 2, method = "TPS")
-
-#Extract coordinates from mean_spec based on modules vector function and create 2 separte mean shapes
-mean_spec[7,]
-
-
-#Import simplified meshes to create warp mesh on
-minke_skull3D <- read.ply("Data/simpleskull.ply") #make sure NO binary encoding (ASCII)
-
-#Check range of mesh and coordinates to make sure it has same scale
-range(minke_skull3D$vb[1:3,]) #if this is too big/small, scale in editor and re-import
-range(mean_spec)
-
-##Create warp meshes, to use as reference for visualization of analyses
-ref_mesh <- warpRefMesh(mesh = minke_skull3D, mesh.coord = mean_spec, ref = mean_shape, color = NULL, centered = FALSE) 
-
-#Show deformation grids on axis from mean shape, do this for all 4 extremes - "TPS" method
-plotRefToTarget(mean_shape_res, PC1min_res, method = "TPS", mag = 1, label = FALSE)  #save image
-
-#Show 3D deformation from mean with points overlay, do this for all 4 extremes - "points" method
-plotRefToTarget(mean_shape_res, PC1min_res, method = "points", mag = 1, label = FALSE)   #save as HTML
-
-#Show 3D deformation from mean with vectors, do this for all 4 extremes - "vector" method
-plotRefToTarget(mean_shape_res, PC1min_res, method = "vector", mag = 1, label = FALSE)   #save as screenshot
-
-#Show 3D deformation from mean by warping 3D mesh, do this for all 4 extremes - "surface" method
-plotRefToTarget(mean_shape_res, PC1min_res, mesh = ref_mesh, method = "surface", mag = 1, label = FALSE)   #save as HTML
-
-##3D windows save
-#Save screenshot of 3D window, useful for lateral and dorsal views - use screen snip if it fails
-rgl.snapshot(filename = "Output/X.png") 
-#Save 3D window as html file - 3D widget
-PC1min <- scene3d()
-widget <- rglwidget()
-filename <- tempfile(fileext = ".html")
-htmlwidgets::saveWidget(rglwidget(), filename)
-browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
-
 
 #GROUP MEANS FOR PHYLOGENTIC/AGE ANALYSIS ----
+
 trees<-"trees_age.nex" #Add trees in Nexus format
+
 agetrees<-read.nexus(trees) #Read the trees for analysis
+
 means <- aggregate(two.d.array(minke.shape.all)~ classifiers, FUN=mean) #Create mean shape for each group based on classifiers
+
 rownames(means) <- c("adult","earlyFetus","lateFetus","neonate") #Set row names that match tree labels
+
 means.age <- as.matrix(means[,-(1)]) #Transform in matrix and exclude columns that do not contain coordinates
+
 means.age<-arrayspecs(means.age,16,3) #Transform in 3D array as whole data
+
 means.CS<-aggregate(logCSsize~ classifiers, FUN=mean) #Mean CS size based on groups
+
 rownames(means.CS) <- c("adult","earlyFetus","lateFetus","neonate") #Set row names that match tree labels
+
 means.CS.age<-select(means.CS,-"classifiers") #Eliminate first column with names of classifiers
+
 means.CS.age<-as.matrix(means.CS.age) #Make numeric
