@@ -999,12 +999,11 @@ ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = ind
 
 
 #PHYLOGENTIC/AGE ANALYSIS ----
-
 #Import trees in Nexus format - branch lenghts needed!!
 trees <- "Data/trees_age_2.nex" 
 trees2 <- "Data/trees_age.nex"
 
-#Read the trees for analysis
+##Read the trees for analysis
 age_trees <- read.nexus(trees) 
 plot(age_trees)
 View(age_trees)
@@ -1099,6 +1098,95 @@ plot(PCA_PaCA_spec2, phylo = TRUE, #add phylogeny
      main = "PaCa", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
 
 
+#Add code for GGplot graphics
+
+
+
+
+#ALLOMETRY ANALYSIS BY GROUP ----
+minkeAllometry_log_age <- procD.lm(minke_coords ~ logCsize * minke_age, iter=999, print.progress = TRUE) 
+View(minkeAllometry_log_age)
+
+#Main results of ANOVA analysis of allometry with logCS
+summary(minkeAllometry_log_age) 
+
+##Plot shape vs logCS to visualize allometry
+#Diagnostic plots to check if model is appropriate - similar to ANOVA tables
+init <- par(no.readonly=TRUE) #store initial plot parameters to restore later
+par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
+allometryplot_diagnostics_age <- plot(minkeAllometry_log_age,type = "diagnostics",
+                                   cex = 1.2, font.main = 2)
+par(init)                     #restore initial plot parameters (1 plot showing at a time)
+
+#Regression score of shape vs logCS - regression method with regression score plotting
+allometryplot_regscore_age <- plot(minkeAllometry_log_age, type = "regression", predictor = logCsize, reg.type = "RegScore",
+                                main = "Shape vs logCS by age",xlab = "logCS", pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)   #improve graphics
+text(x = logCsize, y = allometryplot_regscore_age$RegScore, labels = minke_ind,
+     pos = 3, offset = 0.5, cex = 0.75)    #improve appearance of labels
+
+##Add regression line with confidence intervals to plot
+#Create object to use for linear model
+reg_scores_age <- allometryplot_regscore_age[["RegScore"]] 
+
+#Linear model for line
+reg_line_age <- (lm(reg_scores~logCsize))
+summary(reg_line_age)
+
+#Draw line on plot
+abline(reg_line_age, col = "darkseagreen3", 
+       lty = 2, lwd = 2)     #line type (e.g. dashed) and width
+
+#Add confidence intervals
+#Create data for confidence intervals
+x_vals <- seq(min(logCsize), max(logCsize), length = 12)   #use min and max of x values (logCS) as limits and use number of specimens as length of sequence
+newX <- expand.grid(logCsize = x_vals)                     #warp x_vals on values of x axis (logCS)
+newY <- predict(reg_line_age, newdata = data.frame(x = newX), interval="confidence",
+                level = 0.95)                                      #predict the y values based on the x sequence
+
+#Draw confidence intervals lines on plot
+matlines(newX, newY[,2:3],                                 #first column of newY not useful, it is the fit, 2 and 3 are the min and max values
+         col = "darkseagreen3", lty=1)                     #line graphics
+
+##Make better allometry plot with ggplot
+#Create data frame object that ggplot can read - use data from plot object you want to improve
+minkeAllometry_plot_age <- data.frame(logCS = allometryplot_regscore_age[["plot.args"]][["x"]], RegScores = allometryplot_regscore_age[["plot.args"]][["y"]])
+minkeAllometry_plot_age
+
+#Convert data frame to tibble
+minkeAllometry_plot_age <- as_tibble(minkeAllometry_plot_age)
+glimpse(minkeAllometry_plot_age)
+#Add labels and other attributes to tibble as columns
+minkeAllometry_plot_age <- minkeAllometry_plot_age %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(minkeAllometry_plot_age)
+
+##Add regression line with confidence intervals
+#Make data frame of data for confidence intervals
+conf_intervals <- data.frame(newX, newY)
+conf_intervals 
+#Rename columns to match main plot tibble varibales for x and y
+conf_intervals <- rename(conf_intervals, logCS = logCsize, RegScores = fit)
+conf_intervals 
+
+#Convert data frame to tibble
+conf_intervals <- as_tibble(conf_intervals)
+glimpse(conf_intervals)
+#Add labels and other attributes to tibble as columns to match main plot tibble
+conf_intervals <- conf_intervals %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+glimpse(conf_intervals)
+
+#Nice plot with specimens colored by age AND regression line with confidence intervals
+ggplot(minkeAllometry_plot_age, aes(x = logCS, y = RegScores, label = individuals, colour = age))+
+  geom_smooth(data = conf_intervals, aes(ymin = lwr, ymax = upr), stat = 'identity',          #confidence intervals and reg line, before points
+              colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+      #put col and other graphics OUTSIDE of aes()!!!
+  geom_point(size = 3)+       #points after, so they are on top
+  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
+                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  theme_classic(base_size = 12)+
+  ylab("Regression Score")+
+  ggtitle ("Shape vs logCS by age")+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))+
+  geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
+                  force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance) 
 
 
 
