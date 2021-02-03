@@ -15,37 +15,36 @@ library(ggphylomorpho)
 #DATA IMPORT AND PREP ----
 
 #Import data into R, make sure only first columns are not numbers
-minke_raw <- read_csv("Data/16minkeonly.csv") 
-glimpse(minke_raw)
+raw_data <- read_csv("Data/16minkeonly.csv") 
+glimpse(raw_data)
 
 #Average landmark takes
-minke_avg_takes <- minke_raw %>% group_by(specimenID) %>% summarize(across(starts_with("Raw"), list(mean)))
-glimpse(minke_avg_takes)
+avg_takes <- raw_data %>% group_by(specimenID) %>% summarize(across(starts_with("Raw"), list(mean)))
+glimpse(avg_takes)
 
 #Create data frame with only numerical values and set row names as specimen ID
-minke_avg_takes <- remove_rownames(minke_avg_takes)
-has_rownames(minke_avg_takes) #steps for tibbles
-minke_avg_takes2 <- data.frame(column_to_rownames(minke_avg_takes, var = "specimenID")) #adding row names to data frame
-minke_avg_takes <- minke_avg_takes2 
-remove(minke_avg_takes2) #change name and remove extra object
+avg_takes <- remove_rownames(avg_takes)
+has_rownames(avg_takes) #steps for tibbles
+avg_takes <- data.frame(column_to_rownames(avg_takes, var = "specimenID")) #adding row names to data frame
+glimpse(avg_takes)
 
-#Save individual names as object
-minke_ind <- row.names(minke_avg_takes) 
+#Save specimens names as object
+specimens <- row.names(avg_takes) 
 
 #Transform in 3D array, first number is number of landmarks, second is dimensions (2 or 3)
-minke_array <- arrayspecs(minke_avg_takes, 16, 3) 
+shape_array <- arrayspecs(avg_takes, 16, 3) 
 
 ##Extract classifier columns from raw data
 #Make tibble for plots in ggplot
-minke_age_tibble <- minke_raw %>% 
+classifiers <- raw_data %>% 
   group_by(specimenID) %>% 
   summarize(age) %>%       #this creates a tibble with only the individual names and one text factor (e.g. age)
   distinct()               #this only keeps in the tibble unique combinations of the two values, so you get a tibble with the same number or rows as the data frame
-glimpse(minke_age_tibble)
-has_rownames(minke_age_tibble)    #always check
+glimpse(classifiers)
+has_rownames(classifiers)    #always check
 
 #Save classifiers as factors from tibble
-minke_age <- as.factor(minke_age_tibble$age)
+factor_age <- as.factor(classifiers$age)
 
 #remove objects that are not needed (e.g. "links")
 remove(A) 
@@ -54,39 +53,38 @@ remove(A)
 #GPA ALIGNMENT ----
 
 #Procrustes alignment, should also show mean config coordinates
-minke_gpa<-gpagen(minke_array) 
-View(minke_gpa)
-plot(minke_gpa) #see points in space
+gpa<-gpagen(shape_array) 
+plot(gpa) #see points in space
 
 #Save Centroid size as object
-Csize<-minke_gpa$Csize 
+Csize <- gpa$Csize 
 #Log-transform Centroid size as object
-logCsize<- log10(Csize) 
+logCsize <- log10(Csize) 
 
 #Save mean shape to create links
-mean_shape<-minke_gpa$consensus 
+mean_shape <- gpa$consensus 
 
 #Coordinates of all specimens after GPA alignment
-minke_coords<-minke_gpa$coords 
+coords <- gpa$coords 
 
 #PREPARE WARP MESH AND LINKS  ----
 
 #Find specimen closer to mean, useful to create warp mesh
-findMeanSpec(minke_coords) #number below specimen name is the number of the specimen in the array
+findMeanSpec(coords) #number below specimen name is the number of the specimen in the array
 
 #Create object containing only that specimen coordinates
-mean_spec <- minke_coords[,,2]
-mean_spec
+warp_specimen <- coords[,,2] #number displayed by findMeanSpec
+warp_specimen 
 
 #Import simplified mesh to create warp mesh on
-minke_skull3D <- read.ply("Data/simpleskull.ply") #make sure NO binary encoding (ASCII)
+mesh_3D <- read.ply("Data/simpleskull.ply") #make sure NO binary encoding (ASCII)
 
 #Check range of mesh and coordinates to make sure it has same scale
-range(minke_skull3D$vb[1:3,]) #if this is too big/small, scale in editor and re-import
-range(mean_spec)
+range(mesh_3D$vb[1:3,]) #if this is too big/small, scale in editor and re-import
+range(warp_specimen)
 
 ##Create warp mesh, to use as reference for visualization of analyses
-ref_mesh <- warpRefMesh(mesh = minke_skull3D, mesh.coord = mean_spec, ref = mean_shape, color = NULL, centered = FALSE) 
+ref_mesh <- warpRefMesh(mesh = mesh_3D, mesh.coord = warp_specimen, ref = mean_shape, color = NULL, centered = FALSE) 
 
 ##Define links to create skull shape - use 2D or easy configurations ONLY
 links <- define.links(mean_shape, ptsize = 4) 
@@ -101,10 +99,11 @@ plot(minke_gpa,links=links)
 #PCA COMPLETE DATASET ----
 
 #Run PCA on complete dataset, color points by age/groups that are classifiers
-PCA_all<-gm.prcomp(minke_coords)
+PCA_all <- gm.prcomp(coords)
 
 #List of PC components and proportion of variation
 PCA_all 
+
 ##View plot
 plot(PCA_all, main = "PCA all data",  pch = 21, #title and type of point to be used
      col = "deeppink",   #border of points
@@ -118,7 +117,7 @@ text(x = PCA_all$x[,1], y = PCA_all$x[,2], labels = rownames(PCA_all$x),
      cex = 0.75)    #font size (1=regular)
 
 #Save PC scores as object to use later
-minke_pcscores_all <- PCA_all$x 
+pcscores_all <- PCA_all$x 
 
 #Save shapes of extremes for axes used in plot
 PC1min_all <- PCA_all[["shapes"]][["shapes.comp1"]][["min"]]
@@ -150,15 +149,14 @@ browseURL(filename)    #from browser save screenshots as PNG (right click on ima
 
 ##Make better PCA plot using ggplot
 #Read PC scores as tibble
-minke_pcscores_all <- as_tibble(minke_pcscores_all)
-glimpse(minke_pcscores_all)
-View(minke_pcscores_all)
+pcscores_all <- as_tibble(pcscores_all)
+glimpse(pcscores_all)
 #Add labels and other attributes to tibble as columns
-minke_pcscores_all <- minke_pcscores_all %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
-glimpse(minke_pcscores_all)
+pcscores_all <- pcscores_all %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
+glimpse(pcscores_all)
 
 #Nice plot
-ggplot(minke_pcscores_all, aes(x = Comp1, y = Comp2, label = individuals, colour = age))+
+ggplot(pcscores_all, aes(x = Comp1, y = Comp2, label = individuals, colour = age))+
   geom_point(size = 3)+
   geom_text_repel(colour = "black", size = 3.5)+
   scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
@@ -171,42 +169,43 @@ ggplot(minke_pcscores_all, aes(x = Comp1, y = Comp2, label = individuals, colour
 
 ##Regression PC1 and PC2 vs logCS
 #Create data frame with data
-minke_pcscores_all_df <- data.frame(PCA_all$x , size = logCsize)
-minke_pcscores_all_df
+pcscores_all_df <- data.frame(PCA_all$x , size = logCsize)
 
 #Calculate regression for each component
-PC1_size_reg <- lm(Comp1~size, data = minke_pcscores_all_df)
-PC2_size_reg <- lm(Comp2~size, data = minke_pcscores_all_df)
+reg_PC1all_size <- lm(Comp1~size, data = pcscores_all_df)
+reg_PC2all_size <- lm(Comp2~size, data = pcscores_all_df)
 
 #View results and p-value
-summary(PC1_size_reg)
-summary(PC2_size_reg)
+summary(reg_PC1all_size)
+summary(reg_PC2all_size)
 
 #Diagnostic plots for both regressions
 init <- par(no.readonly=TRUE) #store initial plot parameters to restore later
 par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
-plot(PC1_size_reg, cex = 1.2, font.main = 2)
-plot(PC2_size_reg, cex = 1.2, font.main = 2)                             
+plot(reg_PC1all_size, cex = 1.2, font.main = 2)
+plot(reg_PC2all_size, cex = 1.2, font.main = 2)                             
 par(init)                     #restore initial plot parameters (1 plot showing at a time)
 
 #Plot regression with ggplot
 #Convert data frame to tibble
-minke_pcscores_all_tibble <- as_tibble(minke_pcscores_all_df)
-glimpse(minke_pcscores_all_tibble)
+pcscores_all_tibble <- as_tibble(pcscores_all_df)
+glimpse(pcscores_all_tibble)
 #Add labels and other attributes to tibble as columns
-minke_pcscores_all_tibble <- minke_pcscores_all_tibble %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
-glimpse(minke_pcscores_all_tibble)
+pcscores_all_tibble <- pcscores_all_tibble %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
+glimpse(pcscores_all_tibble)
 
 #Create data frame with line parameters from regression
 #Allows to show a line on PC plot with specimens colored IF col and other graphics OUTSIDE of aes()!!!
-PC_reg_line <- data.frame(int1 = PC1_size_reg[["coefficients"]][["(Intercept)"]], slope1 = PC1_size_reg[["coefficients"]][["size"]], #PC1 values
-                          int2 = PC2_size_reg[["coefficients"]][["(Intercept)"]], slope2 = PC2_size_reg[["coefficients"]][["size"]]) #PC2 values
-PC_reg_line
+regline_PCAall_size <- data.frame(int1 = reg_PC1all_size[["coefficients"]][["(Intercept)"]], 
+                                  slope1 = reg_PC1all_size[["coefficients"]][["size"]], #PC1 values
+                                  int2 = reg_PC2all_size[["coefficients"]][["(Intercept)"]], 
+                                  slope2 = reg_PC2all_size[["coefficients"]][["size"]]) #PC2 values
+regline_PCAall_size 
 
 #Nice plot with specimens colored by age AND regression line with confidence intervals
-ggplot(minke_pcscores_all_tibble, aes(x = size, y = Comp1, label = individuals, colour = age))+
+ggplot(pcscores_all_tibble, aes(x = size, y = Comp1, label = individuals, colour = age))+
   #line on plot
-  geom_abline(data = PC_reg_line, aes(intercept = int1, slope = slope1), colour = "darkblue", size = 0.8, linetype = "dashed", show.legend = FALSE)+
+  geom_abline(data = regline_PCAall_size, aes(intercept = int1, slope = slope1), colour = "darkblue", size = 0.8, linetype = "dashed", show.legend = FALSE)+
   geom_point(size = 3)+
   scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
                       values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
@@ -217,9 +216,9 @@ ggplot(minke_pcscores_all_tibble, aes(x = size, y = Comp1, label = individuals, 
 
 #Repeat for other component
 #Nice plot with specimens colored by age AND regression line with confidence intervals
-ggplot(minke_pcscores_all_tibble, aes(x = size, y = Comp2, label = individuals, colour = age))+
+ggplot(pcscores_all_tibble, aes(x = size, y = Comp2, label = individuals, colour = age))+
   #line on plot
-  geom_abline(data = PC_reg_line, aes(intercept = int2, slope = slope2), colour = "darkblue", size = 0.8, linetype = "dashed", show.legend = FALSE)+
+  geom_abline(data = regline_PCAall_size, aes(intercept = int2, slope = slope2), colour = "darkblue", size = 0.8, linetype = "dashed", show.legend = FALSE)+
   geom_point(size = 3)+
   scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
                       values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
@@ -231,6 +230,8 @@ ggplot(minke_pcscores_all_tibble, aes(x = size, y = Comp2, label = individuals, 
 
 #ALLOMETRY CORRECTION ----
 ##Evaluate allometry and get the allometry-free shapes using LogCS, use this for analyses
+
+#Regression shape on logCS size
 minkeAllometry_log <- procD.lm(minke_coords~logCsize, iter=999, print.progress = TRUE) 
 View(minkeAllometry_log)
 
@@ -293,7 +294,7 @@ minkeAllometry_plot <- as_tibble(minkeAllometry_plot)
 glimpse(minkeAllometry_plot)
 View(minkeAllometry_plot)
 #Add labels and other attributes to tibble as columns
-minkeAllometry_plot <- minkeAllometry_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+minkeAllometry_plot <- minkeAllometry_plot %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(minkeAllometry_plot)
 
 ##Add regression line with confidence intervals
@@ -308,7 +309,7 @@ conf_intervals
 conf_intervals <- as_tibble(conf_intervals)
 glimpse(conf_intervals)
 #Add labels and other attributes to tibble as columns to match main plot tibble
-conf_intervals <- conf_intervals %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+conf_intervals <- conf_intervals %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(conf_intervals)
 
 #Nice plot with specimens colored by age AND regression line with confidence intervals
@@ -353,7 +354,7 @@ minkeAllometry_CAC_plot
 minkeAllometry_CAC_plot <- as_tibble(minkeAllometry_CAC_plot)
 glimpse(minkeAllometry_CAC_plot)
 #Add labels and other attributes to tibble as columns
-minkeAllometry_CAC_plot <- minkeAllometry_CAC_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+minkeAllometry_CAC_plot <- minkeAllometry_CAC_plot %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(minkeAllometry_CAC_plot)
 
 ##Two plots: CAC vs logCsize (A) and RSC1 vs CAC (B)
@@ -382,7 +383,7 @@ conf_intervals_CAC
 conf_intervals_CAC <- as_tibble(conf_intervals_CAC)
 glimpse(conf_intervals_CAC)
 #Add labels and other attributes to tibble as columns to match main plot tibble
-conf_intervals_CAC <- conf_intervals_CAC %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+conf_intervals_CAC <- conf_intervals_CAC %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(conf_intervals_CAC)
 
 #Nice plot with specimens colored by age AND regression line with confidence intervals  - no labels
@@ -413,7 +414,8 @@ ggplot(minkeAllometry_CAC_plot, aes(x = CAC, y = RSC1, colour = age))+
 
 
 #TWO-BLOCK PLS ----
-#Two-block PLS of allometry, another way to visualize connection between logCS and shape, main one for analyses
+
+#Two-block PLS of allometry, another way to visualize connection between logCS and shape
 minkeAllometry_pls <- two.b.pls(logCsize, minke_coords,iter = 999) 
 
 #Get P-value of regression
@@ -439,7 +441,7 @@ minkeAllometry_pls_plot <- as_tibble(minkeAllometry_pls_plot)
 glimpse(minkeAllometry_pls_plot)
 View(minkeAllometry_pls_plot)
 #Add labels and other attributes to tibble as columns
-minkeAllometry_pls_plot <- minkeAllometry_pls_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+minkeAllometry_pls_plot <- minkeAllometry_pls_plot %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(minkeAllometry_pls_plot)
 
 #Nice plot with specimens colored by age AND regression line with confidence intervals
@@ -459,6 +461,7 @@ ggplot(minkeAllometry_pls_plot, aes(x = block1, y = block2, label = individuals,
 
 
 #PCA ALLOMETRY RESIDUALS ----
+
 #New PCA plot with data corrected for allometry
 PCA_residuals <- gm.prcomp(minkeAllometry_residuals) 
 
@@ -509,7 +512,7 @@ minke_pcscores_res <- as_tibble(minke_pcscores_res)
 glimpse(minke_pcscores_res)
 View(minke_pcscores_res)
 #Add labels and other attributes to tibble as columns
-minke_pcscores_res <- minke_pcscores_res %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+minke_pcscores_res <- minke_pcscores_res %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(minke_pcscores_res)
 
 #Nice plot
@@ -526,6 +529,7 @@ ggplot(minke_pcscores_res, aes(x = Comp1, y = Comp2, label = individuals, colour
 
 
 #ANOVA and PROCUSTES VARIANCES OF GROUP DIFFERENCES  ----
+
 #Create dataframe to operate more easily - use allometry residuals
 minke_dataframe <- geomorph.data.frame(minkeAllometry_residuals, gp = minke_age) 
 
@@ -552,6 +556,7 @@ summary(minke_age_disparity)
 
 #TRAJECTORY ANALYSIS ----
 #Shows trajectories of variation using groups, use obj from procD.lm
+
 #Trajectory points must be defined and they can either be a factor to assess different trajectories within groups or they should be = to the nummber of groups
 trajectory_age <- trajectory.analysis(minkeAllometry_log, groups = minke_age_tibble$age, traj.pts = 2, pca = TRUE, print.progress = TRUE) 
 
@@ -622,6 +627,7 @@ ggplot(trajectory_pcscores, aes(x = PC1, y = PC2, colour = age))+
   
 
 #SYMMETRY ANALYSIS ----
+
 #Create links between pairs of symmetric landmarks across line of symmetry to then run symmetry analysis
 landpairs <- define.links(mean_shape, ptsize = 4) 
 
@@ -684,7 +690,7 @@ minkeAllometry_sym_plot <- data.frame(logCS = allometryplot_sym_regscore[["plot.
 minkeAllometry_sym_plot <- as_tibble(minkeAllometry_sym_plot)
 glimpse(minkeAllometry_sym_plot)
 #Add labels and other attributes to tibble as columns
-minkeAllometry_sym_plot <- minkeAllometry_sym_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+minkeAllometry_sym_plot <- minkeAllometry_sym_plot %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(minkeAllometry_sym_plot)
 
 #Nice plot with specimens colored by age
@@ -722,7 +728,7 @@ conf_intervals_sym
 conf_intervals_sym <- as_tibble(conf_intervals_sym)
 glimpse(conf_intervals_sym)
 #Add labels and other attributes to tibble as columns to match main plot tibble
-conf_intervals_sym <- conf_intervals_sym %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+conf_intervals_sym <- conf_intervals_sym %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(conf_intervals_sym)
 
 #Nice plot with regression line and confidence intervals - do not color by age or it will mess it up
@@ -771,7 +777,7 @@ browseURL(filename)    #from browser save screenshots as PNG (right click on ima
 minke_pcscores_sym_res <- as_tibble(minke_pcscores_sym_res)
 glimpse(minke_pcscores_sym_res)
 #Add labels and other attributes to tibble as columns
-minke_pcscores_sym_res <- minke_pcscores_sym_res %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+minke_pcscores_sym_res <- minke_pcscores_sym_res %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(minke_pcscores_sym_res)
 
 #Nice plot
@@ -788,6 +794,7 @@ ggplot(minke_pcscores_sym_res, aes(x = Comp1, y = Comp2, label = individuals, co
 
 
 #MODULARITY TEST AND INTEGRATION TEST ----
+
 #Set all landmarks in one module
 modules <- rep('a',16) 
 
@@ -980,7 +987,7 @@ modules_pls_plot
 modules_pls_plot <- as_tibble(modules_pls_plot)
 glimpse(modules_pls_plot)
 #Add labels and other attributes to tibble as columns
-modules_pls_plot <- modules_pls_plot %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+modules_pls_plot <- modules_pls_plot %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(modules_pls_plot)
 
 #Nice plot with specimens colored by age AND regression line with confidence intervals
@@ -1000,6 +1007,7 @@ ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = ind
 
 
 #PHYLOGENTIC/AGE ANALYSIS ----
+
 #Import trees in Nexus format - branch lenghts needed!!
 trees <- "Data/trees_age_2.nex" 
 trees2 <- "Data/trees_age.nex"
@@ -1150,7 +1158,7 @@ pcscores_phylo <- PCA_phylo_spec1[["x"]]
 pcscores_phylo  <- as_tibble(pcscores_phylo)
 glimpse(pcscores_phylo )
 #Add labels and other attributes to tibble as columns
-pcscores_phylo  <- pcscores_phylo  %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+pcscores_phylo  <- pcscores_phylo  %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(pcscores_phylo)
 
 ##Order tibble by avariable e.g. age
@@ -1211,6 +1219,8 @@ scale_shape_manual(values=c(17, 18, 15))
   
 
 #ALLOMETRY ANALYSIS BY GROUP AND GROUP MEANS ----
+
+#Regression of shapes uncorrected on logCS corrected by group (e.g. species, age)
 minkeAllometry_log_age <- procD.lm(minke_coords ~ logCsize * minke_age, iter=999, print.progress = TRUE) 
 View(minkeAllometry_log_age)
 
@@ -1263,7 +1273,7 @@ minkeAllometry_plot_age
 minkeAllometry_plot_age <- as_tibble(minkeAllometry_plot_age)
 glimpse(minkeAllometry_plot_age)
 #Add labels and other attributes to tibble as columns
-minkeAllometry_plot_age <- minkeAllometry_plot_age %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+minkeAllometry_plot_age <- minkeAllometry_plot_age %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(minkeAllometry_plot_age)
 
 ##Add regression line with confidence intervals
@@ -1278,7 +1288,7 @@ conf_intervals
 conf_intervals <- as_tibble(conf_intervals)
 glimpse(conf_intervals)
 #Add labels and other attributes to tibble as columns to match main plot tibble
-conf_intervals <- conf_intervals %>% mutate(individuals = minke_age_tibble$specimenID, age = minke_age_tibble$age)
+conf_intervals <- conf_intervals %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(conf_intervals)
 
 #Nice plot with specimens colored by age AND regression line with confidence intervals
