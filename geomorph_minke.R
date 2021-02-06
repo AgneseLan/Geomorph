@@ -155,12 +155,20 @@ glimpse(pcscores_all)
 pcscores_all <- pcscores_all %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(pcscores_all)
 
+##Order tibble by variable e.g. age
+#Make factor for variable
+pcscores_all$age <- factor(pcscores_all$age, 
+                    levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+pcscores_all <- pcscores_all_size[order(pcscores_all$age),]
+glimpse(pcscores_all)
+
 #Nice plot
 ggplot(pcscores_all, aes(x = Comp1, y = Comp2, label = individuals, colour = age))+
   geom_point(size = 3)+
   geom_text_repel(colour = "black", size = 3.5)+
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+            #legend and color adjustments
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), #to be ordered as they appear in tibble
+                      values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+            #legend and color adjustments
   theme_bw()+
   xlab("PC 1 (48.89%)")+ #copy this from standard PCA plot
   ylab("PC 2 (22.17%)")+
@@ -169,11 +177,11 @@ ggplot(pcscores_all, aes(x = Comp1, y = Comp2, label = individuals, colour = age
 
 ##Regression PC1 and PC2 vs logCS
 #Create data frame with data
-pcscores_all_df <- data.frame(PCA_all$x , size = logCsize)
+pcscores_all_size <- data.frame(PCA_all$x , size = logCsize)
 
 #Calculate regression for each component
-reg_PC1all_size <- lm(Comp1~size, data = pcscores_all_df)
-reg_PC2all_size <- lm(Comp2~size, data = pcscores_all_df)
+reg_PC1all_size <- lm(Comp1 ~ size, data = pcscores_all_size)
+reg_PC2all_size <- lm(Comp2 ~ size, data = pcscores_all_size)
 
 #View results and p-value
 summary(reg_PC1all_size)
@@ -188,11 +196,19 @@ par(init)                     #restore initial plot parameters (1 plot showing a
 
 #Plot regression with ggplot
 #Convert data frame to tibble
-pcscores_all_tibble <- as_tibble(pcscores_all_df)
-glimpse(pcscores_all_tibble)
+pcscores_all_size <- as_tibble(pcscores_all_size)
+glimpse(pcscores_all_size)
 #Add labels and other attributes to tibble as columns
-pcscores_all_tibble <- pcscores_all_tibble %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
-glimpse(pcscores_all_tibble)
+pcscores_all_size <- pcscores_all_size %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
+glimpse(pcscores_all_size)
+
+#Order tibble by variable e.g. age
+#Make factor for variable
+pcscores_all_size$age <- factor(pcscores_all_size$age, 
+                          levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+pcscores_all_size <- pcscores_all_size[order(pcscores_all_size$age),]
+glimpse(pcscores_all_size)
 
 #Create data frame with line parameters from regression
 #Allows to show a line on PC plot with specimens colored IF col and other graphics OUTSIDE of aes()!!!
@@ -203,28 +219,32 @@ regline_PCAall_size <- data.frame(int1 = reg_PC1all_size[["coefficients"]][["(In
 regline_PCAall_size 
 
 #Nice plot with specimens colored by age AND regression line with confidence intervals
-ggplot(pcscores_all_tibble, aes(x = size, y = Comp1, label = individuals, colour = age))+
+ggplot(pcscores_all_size, aes(x = size, y = Comp1, label = individuals, colour = age))+
   #line on plot
   geom_abline(data = regline_PCAall_size, aes(intercept = int1, slope = slope1), colour = "darkblue", size = 0.8, linetype = "dashed", show.legend = FALSE)+
   geom_point(size = 3)+
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), #to be ordered as they appear in tibble
+                      values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+           
   theme_classic(base_size = 12)+
   xlab("logCS")+
   ylab("PC 1 (48.89%)")+
+  ggtitle("PC1 vs logCS - p-value <0.05**")+  #copy from summary linear model
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13))+
   geom_text_repel(colour = "black", size = 3.5)
 
 #Repeat for other component
 #Nice plot with specimens colored by age AND regression line with confidence intervals
-ggplot(pcscores_all_tibble, aes(x = size, y = Comp2, label = individuals, colour = age))+
+ggplot(pcscores_all_size, aes(x = size, y = Comp2, label = individuals, colour = age))+
   #line on plot
   geom_abline(data = regline_PCAall_size, aes(intercept = int2, slope = slope2), colour = "darkblue", size = 0.8, linetype = "dashed", show.legend = FALSE)+
   geom_point(size = 3)+
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), #to be ordered as they appear in tibble
+                      values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+           
   theme_classic(base_size = 12)+
   xlab("logCS")+
   ylab("PC 2 (22.17%)")+
+  ggtitle("PC2 vs logCS - p-value 0.2468")+  #copy from summary linear model
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13))+
   geom_text_repel(colour = "black", size = 3.5)
 
 
@@ -294,6 +314,14 @@ glimpse(allometry_plot_tibble)
 allometry_plot_tibble <- allometry_plot_tibble %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(allometry_plot_tibble)
 
+#Order tibble by variable e.g. age
+#Make factor for variable
+allometry_plot_tibble$age <- factor(allometry_plot_tibble$age, 
+                                       levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+allometry_plot_tibble <- allometry_plot_tibble[order(allometry_plot_tibble$age),]
+glimpse(allometry_plot_tibble)
+
 ##Add regression line with confidence intervals
 #Make data frame of data for confidence intervals
 allometry_conf_intervals <- data.frame(allometry_newX, allometry_newY)
@@ -309,22 +337,30 @@ glimpse(allometry_conf_intervals)
 allometry_conf_intervals <- allometry_conf_intervals %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(allometry_conf_intervals)
 
+#Order tibble by variable e.g. age to match main plot tibble
+#Make factor for variable
+allometry_conf_intervals$age <- factor(allometry_conf_intervals$age, 
+                                levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+allometry_conf_intervals <- allometry_conf_intervals[order(allometry_conf_intervals$age),]
+glimpse(allometry_conf_intervals)
+
 #Nice plot with specimens colored by age AND regression line with confidence intervals
 ggplot(allometry_plot_tibble, aes(x = logCS, y = RegScores, label = individuals, colour = age))+
   geom_smooth(data = allometry_conf_intervals, aes(ymin = lwr, ymax = upr), stat = 'identity',          #confidence intervals and reg line, before points
               colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+      #put col and other graphics OUTSIDE of aes()!!!
   geom_point(size = 3)+       #points after, so they are on top
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate")  , 
-                      values = c("blue4", "cyan2","deepskyblue1","dodgerblue3"))+           
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), #to be ordered as they appear in tibble
+                      values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+           
   theme_classic(base_size = 12)+
   ylab("Regression Score")+
-  ggtitle ("Shape vs logCS")+
+  ggtitle ("Shape vs logCS - p-value = 0.004**")+  #copy from model summary
   theme(plot.title = element_text(face = "bold", hjust = 0.5))+
   geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
                   force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance) 
 
 
-#PC1 values vs logCS - regression method with "PredLine plotting
+#PC1 values vs logCS - regression method with "PredLine" plotting
 allometry_plot_predline <- plot(allometry,type = "regression",predictor = logCsize, reg.type = "PredLine",
                              main = "PC1 vs logCS",xlab = "logCS", pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)
 text(x = logCsize, y = allometry_plot_predline$PredLine, labels = specimens,
@@ -353,6 +389,15 @@ glimpse(allometry_plot_CAC_tibble)
 #Add labels and other attributes to tibble as columns
 allometry_plot_CAC_tibble <- allometry_plot_CAC_tibble %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(allometry_plot_CAC_tibble)
+
+#Order tibble by variable e.g. age
+#Make factor for variable
+allometry_plot_CAC_tibble$age <- factor(allometry_plot_CAC_tibble$age, 
+                                       levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+allometry_plot_CAC_tibble <- allometry_plot_CAC_tibble[order(allometry_plot_CAC_tibble$age),]
+glimpse(allometry_plot_CAC_tibble)
+
 
 ##Two plots: CAC vs logCsize (A) and RSC1 vs CAC (B)
 #Plot A
@@ -383,16 +428,27 @@ glimpse(allometry_CAC_conf_intervals)
 allometry_CAC_conf_intervals <- allometry_CAC_conf_intervals %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(allometry_CAC_conf_intervals)
 
-#Nice plot with specimens colored by age AND regression line with confidence intervals  - no labels
+#Order tibble by variable e.g. age
+#Make factor for variable
+allometry_CAC_conf_intervals$age <- factor(allometry_CAC_conf_intervals$age, 
+                                levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+allometry_CAC_conf_intervals <- allometry_CAC_conf_intervals[order(allometry_CAC_conf_intervals$age),]
+glimpse(allometry_CAC_conf_intervals)
+
+#Nice plot with specimens colored by age AND regression line with confidence intervals
 ggplot(allometry_plot_CAC_tibble, aes(x = logCS, y = CAC, label = individuals, colour = age))+
   geom_smooth(data = allometry_CAC_conf_intervals, aes(ymin = lwr, ymax = upr), stat = 'identity',          #confidence intervals and reg line, before points
               colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+      #put col and other graphics OUTSIDE of aes()!!!
   geom_point(size = 3)+       #points after, so they are on top
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), #to be ordered as they appear in tibble
+                      values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+           
   theme_classic(base_size = 12)+
-  ggtitle ("CAC vs logCS")+
-  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+  ggtitle ("CAC vs logCS - p-value = 0.004**")+ #copy from allometry model summary
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))+
+  geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
+               force_pull = 3, point.padding = 1) 
+
 
 #Plot B
 
@@ -403,8 +459,8 @@ ggplot(allometry_plot_CAC_tibble, aes(x = CAC, y = RSC1, colour = age))+
   geom_smooth(method = 'lm',        #confidence intervals and reg line, before points
               colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.5)+      #put col and other graphics OUTSIDE of aes()!!!
   geom_point(size = 3)+
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), #to be ordered as they appear in tibble
+                      values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+           
   theme_classic(base_size = 12)+
   ggtitle ("Residual shape component (RSC) 1 vs CAC")+
   theme(plot.title = element_text(face = "bold", hjust = 0.5))
@@ -430,7 +486,7 @@ text(x = block1_pls_logCS, y = block2_pls_shape, labels = specimens,
 
 ##Make better PLS plot with ggplot
 #Create data frame object that ggplot can read - use data from plot object you want to improve
-shape_logCS_pls_plot_tibble <- data.frame(block1 = block1_pls_logCS, block2 = block2_pls_shape)
+shape_logCS_pls_plot_tibble <- data.frame(blocKs_tree1 = block1_pls_logCS, block2 = block2_pls_shape)
 shape_logCS_pls_plot_tibble
 
 #Convert data frame to tibble
@@ -441,14 +497,14 @@ shape_logCS_pls_plot_tibble <- shape_logCS_pls_plot_tibble %>% mutate(individual
 glimpse(shape_logCS_pls_plot_tibble)
 
 #Nice plot with specimens colored by age AND regression line with confidence intervals
-ggplot(shape_logCS_pls_plot_tibble, aes(x = block1, y = block2, label = individuals, colour = age))+
+ggplot(shape_logCS_pls_plot_tibble, aes(x = blocKs_tree1, y = block2, label = individuals, colour = age))+
 #confidence intervals and reg line, before points  
   geom_smooth(method='lm',     #use standard function, values too small    
               colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+  
   geom_point(size = 3)+
   geom_text_repel(colour = "black", size = 3.5)+
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), 
+                        values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+          
   theme_classic(base_size = 12)+
   xlab("PLS1 Block 1: logCS")+
   ylab("PLS1 Block 2: Shape")+
@@ -514,8 +570,8 @@ glimpse(pcscores_res)
 ggplot(pcscores_res, aes(x = Comp1, y = Comp2, label = individuals, colour = age))+
   geom_point(size = 3)+
   geom_text_repel(colour = "black", size = 3.5)+
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+            #legend and color adjustments
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), 
+                        values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+           #legend and color adjustments
   theme_bw()+
   xlab("PC 1 (44.15%)")+ #copy this from standard PCA plot
   ylab("PC 2 (22.79%)")+
@@ -589,11 +645,29 @@ rows_to_repeat <- rows_to_repeat [,-2]
 
 #Add group names and other attributes to tibble as columns
 group_trajectory_pcscores <- group_trajectory_pcscores %>% mutate(age = rows_to_repeat)
+glimpse(group_trajectory_pcscores)
+
+#Order tibble by variable e.g. age
+#Make factor for variable
+group_trajectory_pcscores$age <- factor(group_trajectory_pcscores$age, 
+                                         levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+group_trajectory_pcscores <- group_trajectory_pcscores[order(group_trajectory_pcscores$age),]
+glimpse(group_trajectory_pcscores)
 
 #Calculate means of PC1 and PC2 per group to draw trajectories
 group_trajectory_pcscores_means <- group_trajectory_pcscores %>% group_by(age)  %>%
   summarise_at(vars(PC1, PC2), list(mean = mean))              #function for means, both columns
 glimpse(group_trajectory_pcscores_means)
+
+#Order tibble by variable e.g. age
+#Make factor for variable
+group_trajectory_pcscores_means$age <- factor(group_trajectory_pcscores_means$age, 
+                                       levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+group_trajectory_pcscores_means <- group_trajectory_pcscores_means[order(group_trajectory_pcscores_means$age),]
+glimpse(group_trajectory_pcscores_means)
+
 
 #Rename columns so they are easier to use for plot
 group_trajectory_pcscores_means <- group_trajectory_pcscores_means %>% rename(x = PC1_mean, y = PC2_mean)
@@ -602,24 +676,24 @@ group_trajectory_pcscores_means
 #Nice plot
 ggplot(group_trajectory_pcscores, aes(x = PC1, y = PC2, colour = age))+
   geom_point(size = 3)+
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+            #legend and color adjustments
+#add trajectory lines, one line for each, write row number from tibble, should be in order as legend of plot
+     geom_segment(data = group_trajectory_pcscores_means, aes(x = x[1], y = y[1],  #earlyF
+                                                       xend =  x[2], yend = y[2], colour = age), #lateF
+                 colour = "snow4", size = 0.8, linejoin = 'mitre', arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+ #add arrow at end  
+     geom_segment(data = group_trajectory_pcscores_means, aes(x = x[2], y = y[2], #lateF
+                                                       xend = x[3], yend = y[3], colour = age), #neonate
+                 colour = "snow4", size = 0.8, linejoin = 'mitre', arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+
+     geom_segment(data = group_trajectory_pcscores_means, aes(x = x[3], y = y[3], #neonate
+                                                       xend = x[4], yend = y[4]),  #adult 
+                 colour = "snow4", size = 0.8, linejoin = 'mitre', arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), #to be ordered as they appear in tibble
+                      values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+            #legend and color adjustments
   theme_bw()+
   xlab("PC 1 (60.17%)")+ #copy this from standard trajectory plot
   ylab("PC 2 (30.92%)")+
   ggtitle("Trajectories by age")+
-  theme(plot.title = element_text(face = "bold", hjust = 0.5))+  #title font and position
- #add trajectory lines, one line for each, write row number from tibble, should be in order as legend of plot
-     geom_segment(data = group_trajectory_pcscores_means, aes(x = x[2], y = y[2],  #earlyF
-                                                       xend =  x[3], yend = y[3], colour = age), #lateF
-                 colour = "gray35", size = 0.8, linejoin = 'mitre', arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+ #add arrow at end  
-     geom_segment(data = group_trajectory_pcscores_means, aes(x = x[3], y = y[3], #lateF
-                                                       xend = x[4], yend = y[4], colour = age), #neonate
-                 colour = "gray35", size = 0.8, linejoin = 'mitre', arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed"))+
-     geom_segment(data = group_trajectory_pcscores_means, aes(x = x[4], y = y[4], #neonate
-                                                       xend = x[1], yend = y[1]),  #adult 
-                 colour = "gray35", size = 0.8, linejoin = 'mitre', arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "last", type = "closed")) 
-   
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))  #title font and position
+
 
 #SYMMETRY ANALYSIS ----
 
@@ -687,6 +761,14 @@ glimpse(allometry_sym_plot_tibble)
 allometry_sym_plot_tibble <- allometry_sym_plot_tibble %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(allometry_sym_plot_tibble)
 
+#Order tibble by variable e.g. age
+#Make factor for variable
+allometry_sym_plot_tibble$age <- factor(allometry_sym_plot_tibble$age, 
+                                       levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+allometry_sym_plot_tibble <- allometry_sym_plot_tibble[order(allometry_sym_plot_tibble$age),]
+glimpse(allometry_sym_plot_tibble)
+
 ##Add regression line with confidence intervals
 #Create object to use for linear model
 allometry_sym_regscores <- allometry_sym_plot_regscore[["RegScore"]] 
@@ -714,16 +796,25 @@ glimpse(allometry_sym_conf_intervals)
 allometry_sym_conf_intervals <- allometry_sym_conf_intervals %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(allometry_sym_conf_intervals)
 
-#Nice plot with regression line and confidence intervals - do not color by age or it will mess it up
+#Order tibble by variable e.g. age
+#Make factor for variable
+allometry_sym_conf_intervals$age <- factor(allometry_sym_conf_intervals$age, 
+                                       levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+allometry_sym_conf_intervals <- allometry_sym_conf_intervals[order(allometry_sym_conf_intervals$age),]
+glimpse(allometry_sym_conf_intervals)
+
+
+#Nice plot with regression line and confidence intervals
 ggplot(allometry_sym_plot_tibble, aes(x = logCS, y = RegScores, label = individuals, colour = age))+
   geom_smooth(data = allometry_sym_conf_intervals, aes(ymin = lwr, ymax = upr), stat = 'identity',          #confidence intervals and reg line, before points
               colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+      #put col and other graphics OUTSIDE of aes()!!!
   geom_point(size = 3)+       #points after, so they are on top
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate")  , 
-                      values = c("blue4", "cyan2","deepskyblue1","dodgerblue3"))+           
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), 
+                      values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+           
   theme_classic(base_size = 12)+
   ylab("Regression Score")+
-  ggtitle ("Symmetric shape vs logCS")+
+  ggtitle ("Symmetric shape vs logCS - p-value = 0.004**")+ #copy from model summary
   theme(plot.title = element_text(face = "bold", hjust = 0.5))+
   geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
                   force_pull = 3, point.padding = 1) 
@@ -766,12 +857,20 @@ glimpse(pcscores_res_sym)
 pcscores_res_sym <- pcscores_res_sym %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(pcscores_res_sym)
 
+#Order tibble by variable e.g. age for plot legend
+#Make factor for variable
+pcscores_res_sym$age <- factor(pcscores_res_sym$age, 
+                                levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+pcscores_res_sym <- pcscores_res_sym[order(pcscores_res_sym$age),]
+glimpse(pcscores_res_sym)
+
 #Nice plot
 ggplot(pcscores_res_sym, aes(x = Comp1, y = Comp2, label = individuals, colour = age))+
   geom_point(size = 3)+
   geom_text_repel(colour = "black", size = 3.5)+
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+            #legend and color adjustments
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), 
+                        values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+         #legend and color adjustments
   theme_bw()+
   xlab("PC 1 (47.38%)")+ #copy this from standard PCA plot or from PCA summary
   ylab("PC 2 (23.76%)")+
@@ -792,7 +891,7 @@ modules
 #Perform modularity test - compare selected modules to the null assumption of random assignment of partitions (no modularity at all) 
 #Is the data modular according to my defined modules?
 #Best done on allometric residuals - NOT ON SYMMETRY data, not a biological significant hypothesis and little difference
-modularity_test <- modularity.test(minkeAllometry_residuals, modules, CI = T,iter = 999, print.progress = T) 
+modularity_test <- modularity.test(allometry_residuals, modules, CI = T,iter = 999, print.progress = T) 
 
 #Get P value for CR values (same as RV)
 summary(modularity_test) 
@@ -805,153 +904,162 @@ plot(modularity_test)
 CRdata <- modularity_test[["CR"]]
 
 #Save all generated CRs as object
-CR <- modularity_test[["CR.boot"]]
+CRs <- modularity_test[["CR.boot"]]
 
 #Calculate mean of CRs for arrow
-mean_CR <- mean(CR)
+mean_CR <- mean(CRs)
 
 #Create tibble with modularity analysis values
-modularity_plot <- data.frame(CR)
-modularity_plot <- as_tibble(modularity_plot )
-glimpse(modularity_plot)
+modularity_plot_tibble <- data.frame(CRs)
+modularity_plot_tibble <- as_tibble(modularity_plot_tibble)
+glimpse(modularity_plot_tibble)
 
-#Make simple histogram plot as object to obtain counts per bin with given bin width (try to see if binwidth value appropiate)
-plot1 <- ggplot(modularity_plot, aes(CR))+
-  geom_histogram(binwidth = 0.01, fill = "azure2", colour = "azure4")
-plot1
+#Make simple histogram plot as object to obtain counts per bin with given bin width 
+modularity_plot <- ggplot(modularity_plot_tibble, aes(CRs))+
+  geom_histogram(binwidth = 0.01, fill = "gray91", colour = "gray78") #see if binwidth value appropriate and choose colors
+modularity_plot
 
 #Create data frame with plot variables
-plot2 <- ggplot_build(plot1)  
+modularity_plot_data <- ggplot_build(modularity_plot)  
 
 #Save only data counts as tibble
-plot2_data <- plot2[["data"]][[1]]
-plot2_data <- plot2_data[,1:5]
-plot2_data <- as_tibble(plot2_data)
+modularity_plot_data <- modularity_plot_data[["data"]][[1]]
+modularity_plot_data <- modularity_plot_data[,1:5]
+modularity_plot_data <- as_tibble(modularity_plot_data)
 
 #Filter rows to select row with count for CR data and mean CR 
-count_CRdata <- plot2_data %>% filter(xmin <= CRdata, xmax >= CRdata)
-count_meanCR <- plot2_data %>% filter(xmin <= mean_CR, xmax >= mean_CR)
+CRdata_filter <- modularity_plot_data %>% filter(xmin <= CRdata, xmax >= CRdata)
+mean_CR_filter <- modularity_plot_data %>% filter(xmin <= mean_CR, xmax >= mean_CR)
 
 #Create tibble with x and y columns to build arrows - x = mean position on bin, y = starting position on bin
-arrow_plot <- data.frame(x_data = count_CRdata$x, y_data = count_CRdata$y, x_mean = count_meanCR$x, y_mean = count_meanCR$y)
-arrow_plot <- as_tibble(arrow_plot)
-glimpse(arrow_plot)
+modularity_plot_arrow <- data.frame(x_data = CRdata_filter$x, y_data = CRdata_filter$y, 
+                                    x_mean = mean_CR_filter$x, y_mean = mean_CR_filter$y)
+modularity_plot_arrow <- as_tibble(modularity_plot_arrow)
+
+#Check that values of x are similar to the original data and mean values, if not change bins number or binwidth in original plot (add bins)
+glimpse(modularity_plot_arrow)  
 
 #Nice plot  
-ggplot(modularity_plot, aes(CR))+
-  geom_histogram(binwidth = 0.01, fill = "azure2", colour = "azure4")+
+modularity_plot + #use plot obtained before after color and binwidth ok
  #add arrow for CR data
-  geom_segment(data = arrow_plot, aes(x = x_data, xend = x_data, y = y_data, yend = y_data + 10, colour = "firebrick4"), size = 1.1,
+  geom_segment(data = modularity_plot_arrow, aes(x = x_data, xend = x_data, y = y_data, yend = y_data + 10, colour = "slateblue4"), size = 1.1,
                arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "first", type = "closed"), linejoin = 'mitre')+
  #add arrow for mean CR 
-  geom_segment(data = arrow_plot, aes(x = x_mean, xend = x_mean, y = y_mean, yend = y_mean + 10, colour = "black"), size = 1.1,
+  geom_segment(data = modularity_plot_arrow, aes(x = x_mean, xend = x_mean, y = y_mean, yend = y_mean + 10, colour = "skyblue3"), size = 1.1,
                arrow = arrow(angle = 30, length = unit(0.03, "npc"), ends = "first", type = "closed"), linejoin = 'mitre')+
-  scale_colour_manual(name = NULL, labels = c("CR data", "mean CR"), 
-                      values = c("firebrick4","black"))+            #legend and color adjustments
+#legend and color adjustments 
+  scale_colour_manual(name = NULL, labels = c("mean CR (0.944)","CR data (0.882)"), #copy data from objects
+                      values = c("slateblue4","skyblue3"))+            
   theme_minimal()+
   xlab("CR coefficient")+
   ylab("Frequency")+
-  ggtitle("Modularity analysis - p-value=0.0003")+
-  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+  ggtitle("Modularity analysis - p-value <0.05***")+  #copy data from standard plot
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13))
 
 ##Perform integration test between the 2 modules (two-block PLS within configuration) 
 #How much are the two or more modules integrated with each other?
 #Best done on allometric residuals - NOT ON SYMMETRY data, not a biological significant hypothesis and little difference
-integration_test <- integration.test(minkeAllometry_residuals, partition.gp = modules, iter = 999, print.progress = T) 
+integration_test <- integration.test(allometry_residuals, partition.gp = modules, iter = 999, print.progress = T) 
 
 #Get P value and effect size Z - if significant means the modules are integrated!
 summary(integration_test) 
 
 #PLS plot of the two modules - two-block PLS with regression line
-modulesplot_pls <- plot(integration_test, 
-                        pch = 21, col = "darkgoldenrod2", bg = "darkgoldenrod2", cex = 1.2, ) 
+integration_pls_plot <- plot(integration_test, 
+                        pch = 21, col = "darkgoldenrod2", bg = "darkgoldenrod2", cex = 1.2) 
 
 #Save plot arguments as objects to use in plots
-block1_modules <- modulesplot_pls$plot.args$x
-block2_modules <- modulesplot_pls$plot.args$y
+block1_pls_integr <- integration_pls_plot$plot.args$x
+block2_pls_integr <- integration_pls_plot$plot.args$y
 
 #Add labels
-text(x = block1_modules, y = block2_modules, labels = specimens,
+text(x = block1_pls_integr, y = block2_pls_integr, labels = specimens,
      pos = 3, offset = 0.5, cex = 0.75)   #improve appearance of labels
 
 
 ##Obtain shapes of modules at min and max of Block 1 and Block 2 axes
 
 #Quick way to visualize shape changes on axes with interactive plot with "points" method
-picknplot.shape(modulesplot_pls, label = TRUE, mag = 1)
+picknplot.shape(integration_pls_plot, label = TRUE, mag = 1)
 
 #Better way using shape.predictor and plotReftoTarget - "TPS" and "surface" methods
 #Save for block 1 and block 2 as objects from plot
-block1_shapes <- modulesplot_pls$A1
-block2_shapes <- modulesplot_pls$A2
+block1_pls_integr_shapes <- integration_pls_plot$A1
+block2_pls_integr_shapes <- integration_pls_plot$A2
 
 #Create mean shape for each block
-block1_mean_shape <- mshape(modulesplot_pls$A1)
-block2_mean_shape <- mshape(modulesplot_pls$A2)
+block1_pls_integr_mshape <- mshape(integration_pls_plot$A1)
+block2_pls_integr_mshape <- mshape(integration_pls_plot$A2)
 
 #Find specimen closer to mean for each block, useful to create warp mesh
-findMeanSpec(block1_shapes)
-findMeanSpec(block2_shapes)
+findMeanSpec(block1_pls_integr_shapes)
+findMeanSpec(block2_pls_integr_shapes)
 
 #Create object containing only that specimen coordinates
-block1_mean_spec <- block1_shapes[,,6]
-block2_mean_spec <- block2_shapes[,,12]
+block1_pls_integr_warp_spec <- block1_pls_integr_shapes[,,6]
+block2_pls_integr_warp_spec <- block2_pls_integr_shapes[,,12]
 
 #Import reference meshes for each block to use in surface method - parts of original reference mesh
-block1_3D <- read.ply("Data/simpleskull_block1_rostrum.ply") #make sure NO binary encoding (ASCII)
-block2_3D <- read.ply("Data/simpleskull_block2_braincase.ply") #make sure NO binary encoding (ASCII)
+block1_mesh_3D <- read.ply("Data/simpleskull_blocKs_tree1_rostrum.ply") #make sure NO binary encoding (ASCII)
+block2_mesh_3D <- read.ply("Data/simpleskull_block2_braincase.ply") #make sure NO binary encoding (ASCII)
 
 #Check range of mesh and coordinates to make sure it has same scale
-range(block1_3D$vb[1:3,]) #if this is too big/small, scale in editor and re-import
-range(block1_mean_spec)
-range(block2_3D$vb[1:3,]) #if this is too big/small, scale in editor and re-import
-range(block2_mean_spec)
+range(block1_mesh_3D$vb[1:3,]) #if this is too big/small, scale in editor and re-import
+range(block1_pls_integr_warp_spec)
+range(block2_mesh_3D$vb[1:3,]) #if this is too big/small, scale in editor and re-import
+range(block2_pls_integr_warp_spec)
 
 #Create warp meshes, to use as reference for visualization of analyses
-block1_ref_mesh <- warpRefMesh(mesh = block1_3D, mesh.coord = block1_mean_spec, ref = block1_mean_shape, color = NULL, centered = FALSE) 
-block2_ref_mesh <- warpRefMesh(mesh = block2_3D, mesh.coord = block2_mean_spec, ref = block2_mean_shape, color = NULL, centered = FALSE) 
+block1_pls_integr_ref_mesh <- warpRefMesh(mesh = block1_mesh_3D, mesh.coord = block1_pls_integr_warp_spec, 
+                                          ref = block1_pls_integr_mshape, color = NULL, centered = FALSE) 
+block2_pls_integr_ref_mesh <- warpRefMesh(mesh = block2_mesh_3D, mesh.coord = block2_pls_integr_warp_spec, 
+                                          ref = block2_pls_integr_mshape, color = NULL, centered = FALSE) 
 
 ##Use shape predictor to generate shape coordinate at min and max of each block 
-block1_shape_pred <- shape.predictor(block1_shapes, #shapes of block
-                             x = block1_modules, #values of axis form plot
+block1_pls_integr_shape_pred <- shape.predictor(block1_pls_integr_shapes, #shapes of block
+                             x = block1_pls_integr, #values of axis form plot
                              Intercept = FALSE,  
                              method = "PLS",  #since it's the results of a PLS method
-                             min = min(block1_modules), #min value of axis
-                             max = max(block1_modules)) #max value of axis
+                             min = min(block1_pls_integr), #min value of axis
+                             max = max(block1_pls_integr)) #max value of axis
 
 #Show deformation grids on axis from mean shape, do this for all 4 extremes - "TPS" method
-plotRefToTarget(block1_mean_shape, block1_shape_pred$min, mag = 1, method = "TPS") #save image
-plotRefToTarget(block1_mean_shape, block1_shape_pred$max, mag = 1, method = "TPS") #save image
+plotRefToTarget(block1_pls_integr_mshape, block1_pls_integr_shape_pred$min, mag = 1, method = "TPS") #save image
+plotRefToTarget(block1_pls_integr_mshape, block1_pls_integr_shape_pred$max, mag = 1, method = "TPS") #save image
 
 #Show 3D deformation from mean by warping 3D mesh, do this for all 4 extremes - "surface" method
-plotRefToTarget(block1_mean_shape, block1_shape_pred$min, mesh = block1_ref_mesh, method = "surface", mag = 1)   #save as HTML
-plotRefToTarget(block1_mean_shape, block1_shape_pred$max, mesh = block1_ref_mesh, method = "surface", mag = 1)   #save as HTML
+plotRefToTarget(block1_pls_integr_mshape, block1_pls_integr_shape_pred$min, 
+                mesh = block1_pls_integr_ref_mesh, method = "surface", mag = 1)   #save as HTML
+plotRefToTarget(block1_pls_integr_mshape, block1_pls_integr_shape_pred$max, 
+                mesh = block1_pls_integr_ref_mesh, method = "surface", mag = 1)   #save as HTML
 
 ##3D windows save
 #Save screenshot of 3D window, useful for lateral and dorsal views - use screen snip if it fails
 rgl.snapshot(filename = "Output/X.png") 
 #Save 3D window as html file - 3D widget
-block1_pred <- scene3d()
+blocKs_tree1_pred <- scene3d()
 widget <- rglwidget()
 filename <- tempfile(fileext = ".html")
 htmlwidgets::saveWidget(rglwidget(), filename)
 browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
 
 #Repeat for other block
-block2_shape_pred <- shape.predictor(block2_shapes, #shapes of block
-                                     x = block2_modules, #values of axis form plot
+block2_pls_integr_shape_pred <- shape.predictor(block2_pls_integr_shapes, #shapes of block
+                                     x = block2_pls_integr, #values of axis form plot
                                      Intercept = FALSE,  
                                      method = "PLS",  #since it's the results of a PLS method
-                                     min = min(block2_modules), #min value of axis
-                                     max = max(block2_modules)) #max value of axis
+                                     min = min(block2_pls_integr), #min value of axis
+                                     max = max(block2_pls_integr)) #max value of axis
 
 #Show deformation grids on axis from mean shape, do this for all 4 extremes - "TPS" method
-plotRefToTarget(block2_mean_shape, block2_shape_pred$min, mag = 1, method = "TPS") #save image
-plotRefToTarget(block2_mean_shape, block2_shape_pred$max, mag = 1, method = "TPS") #save image
+plotRefToTarget(block2_pls_integr_mshape, block2_pls_integr_shape_pred$min, mag = 1, method = "TPS") #save image
+plotRefToTarget(block2_pls_integr_mshape, block2_pls_integr_shape_pred$max, mag = 1, method = "TPS") #save image
 
 #Show 3D deformation from mean by warping 3D mesh, do this for all 4 extremes - "surface" method
-plotRefToTarget(block2_mean_shape, block2_shape_pred$min, mesh = block2_ref_mesh, method = "surface", mag = 1)   #save as HTML
-plotRefToTarget(block2_mean_shape, block2_shape_pred$max, mesh = block2_ref_mesh, method = "surface", mag = 1)   #save as HTML
+plotRefToTarget(block2_pls_integr_mshape, block2_pls_integr_shape_pred$min, 
+                mesh = block2_pls_integr_ref_mesh, method = "surface", mag = 1)   #save as HTML
+plotRefToTarget(block2_pls_integr_mshape, block2_pls_integr_shape_pred$max, 
+                mesh = block2_pls_integr_ref_mesh, method = "surface", mag = 1)   #save as HTML
 
 ##3D windows save
 #Save screenshot of 3D window, useful for lateral and dorsal views - use screen snip if it fails
@@ -964,27 +1072,27 @@ htmlwidgets::saveWidget(rglwidget(), filename)
 browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
 
 
-##Make better PLS plot with ggplot
+##Make better integration PLS plot with ggplot
 #Create data frame object that ggplot can read - use data from plot object you want to improve
-modules_pls_plot <- data.frame(block1_modules, block2_modules)
-modules_pls_plot
+integration_pls_plot_tibble <- data.frame(block1_pls_integr, block2_pls_integr)
+integration_pls_plot_tibble
 
 #Convert data frame to tibble
-modules_pls_plot <- as_tibble(modules_pls_plot)
-glimpse(modules_pls_plot)
+integration_pls_plot_tibble <- as_tibble(integration_pls_plot_tibble)
+glimpse(integration_pls_plot_tibble)
 #Add labels and other attributes to tibble as columns
-modules_pls_plot <- modules_pls_plot %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
-glimpse(modules_pls_plot)
+integration_pls_plot_tibble <- integration_pls_plot_tibble %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
+glimpse(integration_pls_plot_tibble)
 
 #Nice plot with specimens colored by age AND regression line with confidence intervals
-ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = individuals, colour = age))+
+ggplot(integration_pls_plot_tibble, aes(x = block1_pls_integr, y = block2_pls_integr, label = individuals, colour = age))+
   #confidence intervals and reg line, before points  
   geom_smooth(method='lm',     #use standard function, values too small    
               colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+  
   geom_point(size = 3)+
   geom_text_repel(colour = "black", size = 3.5)+
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), 
+                        values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+          
   theme_classic(base_size = 12)+
   xlab("PLS1 Block 1: rostrum")+
   ylab("PLS1 Block 1: braincase")+
@@ -994,38 +1102,45 @@ ggplot(modules_pls_plot, aes(x = block1_modules, y = block2_modules, label = ind
 
 #PHYLOGENTIC/AGE ANALYSIS ----
 
-#Import trees in Nexus format - branch lenghts needed!!
-trees <- "Data/trees_age_2.nex" 
-trees2 <- "Data/trees_age.nex"
+#Import trees in Nexus format - branch lengths needed!!
+trees1 <- "Data/trees_age_2.nex"   #trees with groups
+trees2 <- "Data/trees_age.nex"     #specimen-level trees
 
 ##Read the trees for analysis
-age_trees <- read.nexus(trees) 
-plot(age_trees)
-View(age_trees)
-spec_trees <- read.nexus(trees2)
-plot(spec_trees)
-View(spec_trees)
+trees_age <- read.nexus(trees1) #trees with groups
+plot(trees_age)
+#Press enter to view next tree plots
+trees_specimens <- read.nexus(trees2)   #specimen-level trees
+plot(trees_specimens)
+#Press enter to view next tree plots
 
+#Check names of each tree in object
+summary(trees_age)
+summary(trees_specimens)    
 
-##Phylomorphospace
+##PCA Phylomorphospace
 #Simple phylogeny projected on morphospace, no calculations
-PCA_phylomor_spec1 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age2)
-PCA_phylomor_spec2 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age4)
+PCA_res_phylomor_tree1 <- gm.prcomp(allometry_residuals, phy = trees_specimens$age2)
+PCA_res_phylomor_tree2 <- gm.prcomp(allometry_residuals, phy = trees_specimens$age4)
 
 #View results
-summary(PCA_phylomor_spec1)
-summary(PCA_phylomor_spec2)
+summary(PCA_res_phylomor_tree1)
+summary(PCA_res_phylomor_tree2)
 
-#Plot PCA
-plot(PCA_phylomor_spec1, phylo = TRUE, #add phylogeny
-     main = "PCA phylomorphospace",  pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
-plot(PCA_phylomor_spec2, phylo = TRUE, #add phylogeny
-     main = "PCA phylomorphospace",  pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+#Plot PCA with phylomorphospace
+plot(PCA_res_phylomor_tree1, phylo = TRUE, #add phylogeny
+     main = "PCA phylomorphospace - tree1",  pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+plot(PCA_res_phylomor_tree2, phylo = TRUE, #add phylogeny
+     main = "PCA phylomorphospace - tree2",  pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
 
 #3D phylo plot
-plot(PCA_phylomor_spec1, time.plot = TRUE, pch = 21, col = "deeppink", bg = "deeppink", cex = 2, 
+plot(PCA_res_phylomor_tree1, time.plot = TRUE, pch = 21, col = "deeppink", bg = "deeppink", cex = 2, 
      phylo.par = list(edge.color = "grey60", edge.width = 1.5, tip.txt.cex = 0.75,
                       node.labels = F, anc.states = F))
+plot(PCA_res_phylomor_tree2, time.plot = TRUE, pch = 21, col = "deeppink", bg = "deeppink", cex = 2, 
+     phylo.par = list(edge.color = "grey60", edge.width = 1.5, tip.txt.cex = 0.75,
+                      node.labels = F, anc.states = F))
+
 ##3D windows save
 #Save screenshot of 3D window, useful for lateral and dorsal views - use screen snip if it fails
 rgl.snapshot(filename = "Output/X.png") 
@@ -1037,167 +1152,164 @@ htmlwidgets::saveWidget(rglwidget(), filename)
 browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
 
 ##Test for phylogenetic signal in shape residuals
-phylo_signal1 <- physignal(minkeAllometry_residuals,phy = spec_trees$age2, iter = 999)
-phylo_signal2 <- physignal(minkeAllometry_residuals,phy = spec_trees$age4, iter = 999)
+phylo_signal_res_tree1 <- physignal(allometry_residuals,phy = trees_specimens$age2, iter = 999)
+phylo_signal_res_tree2 <- physignal(allometry_residuals,phy = trees_specimens$age4, iter = 999)
 
 #View results
-summary(phylo_signal1)
-summary(phylo_signal2)
+summary(phylo_signal_res_tree1)
+summary(phylo_signal_res_tree2)
 
 #Histogram of phylogenetic signal
-plot(phylo_signal1)
-plot(phylo_signal2)
+plot(phylo_signal_res_tree1)
+plot(phylo_signal_res_tree2)
 
-##Make better histogram plot with ggplot (phylo_signal1 as example)
+##Make better histogram plot with ggplot (phylo_signal_res_tree1 as example)
 #Save phylo signal K of data as object
-K1data <- phylo_signal1[["phy.signal"]]
+Kdata_tree1 <- phylo_signal_res_tree1[["phy.signal"]]
 
 #Save random Ks phylo signals as object
-K1 <- phylo_signal1[["random.K"]]
+Ks_tree1 <- phylo_signal_res_tree1[["random.K"]]
 
 #Calculate mean of Ks for arrow
-meanK1 <- mean(K1)
+mean_K_tree1 <- mean(Ks_tree1)
 
 #Create tibble with phylogentic signal analysis values
-phylo_signal1_plot <- data.frame(K1)
-phylo_signal1_plot <- as_tibble(phylo_signal1_plot)
-glimpse(phylo_signal1_plot)
+phylo_signal_res_tree1_plot_tibble <- data.frame(Ks_tree1)
+phylo_signal_res_tree1_plot_tibble <- as_tibble(phylo_signal_res_tree1_plot_tibble)
+glimpse(phylo_signal_res_tree1_plot_tibble)
 
-#Make simple histogram plot as object to obtain counts per bin with given bin width (try to see if binwidth value appropiate)
-plot1 <- ggplot(phylo_signal1_plot, aes(K1))+
-  geom_histogram(binwidth = 0.01, fill = "azure2", colour = "azure4")
-plot1
+#Make simple histogram plot as object to obtain counts per bin with given bin width
+phylo_signal_res_tree1_plot <- ggplot(phylo_signal_res_tree1_plot_tibble, aes(Ks_tree1))+
+  geom_histogram(bins = 30, fill = "azure2", colour = "azure4")     #see if bins value appropriate and choose colors
+phylo_signal_res_tree1_plot
 
 #Create data frame with plot variables
-plot2 <- ggplot_build(plot1)  
+phylo_signal_res_tree1_plot_data <- ggplot_build(phylo_signal_res_tree1_plot)  
 
 #Save only data counts as tibble
-plot2_data <- plot2[["data"]][[1]]
-plot2_data <- plot2_data[,1:5]
-plot2_data <- as_tibble(plot2_data)
-glimpse(plot2_data)
+phylo_signal_res_tree1_plot_data <- phylo_signal_res_tree1_plot_data[["data"]][[1]]
+phylo_signal_res_tree1_plot_data <- phylo_signal_res_tree1_plot_data[,1:5]
+phylo_signal_res_tree1_plot_data <- as_tibble(phylo_signal_res_tree1_plot_data)
+glimpse(phylo_signal_res_tree1_plot_data)
 
 #Filter rows to select row with count for CR data and mean CR 
-count_K1data <- plot2_data %>% filter(xmin <= K1data, xmax >= K1data)
-count_meanK1 <- plot2_data %>% filter(xmin <= meanK1, xmax >= meanK1)
+Kdata_tree1_filter <- phylo_signal_res_tree1_plot_data %>% filter(xmin <= Kdata_tree1, xmax >= Kdata_tree1)
+mean_K_tree1_filter <- phylo_signal_res_tree1_plot_data %>% filter(xmin <= mean_K_tree1, xmax >= mean_K_tree1)
 
 #Create tibble with x and y columns to build arrows - x = mean position on bin, y = starting position on bin
-arrow_plot <- data.frame(x_data = count_K1data$x, y_data = count_K1data$y, x_mean = count_meanK1$x, y_mean = count_meanK1$y)
-arrow_plot <- as_tibble(arrow_plot)
-glimpse(arrow_plot)
+phylo_signal_res_tree1_arrow_plot <- data.frame(x_data = Kdata_tree1_filter$x, y_data = Kdata_tree1_filter$y, 
+                                                x_mean = mean_K_tree1_filter$x, y_mean = mean_K_tree1_filter$y)
+phylo_signal_res_tree1_arrow_plot <- as_tibble(phylo_signal_res_tree1_arrow_plot)
+
+#Check that values of x are similar to the original data and mean values, if not change bins number or binwidth in original plot (add bins)
+glimpse(phylo_signal_res_tree1_arrow_plot)
 
 #Nice plot  
-ggplot(phylo_signal1_plot, aes(K1))+
-  geom_histogram(binwidth = 0.01, fill = "azure2", colour = "azure4")+
+phylo_signal_res_tree1_plot + #use plot obtained before after color and binwidth ok
   #add arrow for CR data
-  geom_segment(data = arrow_plot, aes(x = x_data, xend = x_data, y = y_data, yend = y_data + 30, colour = "firebrick4"), size = 1,
+  geom_segment(data = phylo_signal_res_tree1_arrow_plot, aes(x = x_data, xend = x_data, y = y_data, yend = y_data + 20, colour = "firebrick4"), size = 1,
                arrow = arrow(angle = 30, length = unit(0.02, "npc"), ends = "first", type = "closed"), linejoin = 'mitre')+
   #add arrow for mean CR 
-  geom_segment(data = arrow_plot, aes(x = x_mean, xend = x_mean, y = y_mean, yend = y_mean + 30, colour = "black"), size = 1,
+  geom_segment(data = phylo_signal_res_tree1_arrow_plot, aes(x = x_mean, xend = x_mean, y = y_mean, yend = y_mean + 20, colour = "black"), size = 1,
                arrow = arrow(angle = 30, length = unit(0.02, "npc"), ends = "first", type = "closed"), linejoin = 'mitre')+
-  scale_colour_manual(name = NULL, labels = c("Observed K", "mean K"), 
-                      values = c("firebrick4","black"))+            #legend and color adjustments
+#legend and color adjustments  
+  scale_colour_manual(name = NULL, labels = c("mean K (0.348)", "Observed K (0.325)"),    #copy data from objects
+                      values = c("black", "firebrick4"))+        
   theme_minimal()+
   xlab("Phylogenetic Signal K")+
   ylab("Frequency")+
-  ggtitle("Phylogentic Signal test - p-value=0.743")+
-  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+  ggtitle("Phylogentic Signal test tree1 - p-value=0.743")+  #copy data from standard plot
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13))
 
-#Phylogentic signal test for shapes produces PaCa
+#Phylogenetic signal test for shapes produces PaCa
 ##PaCA: Phylogenetically-aligned PCA
 #Projection of phylogenetic signal in the first two components, helps to highlight importance of phylogeny relative to other signals
-PCA_PaCA_spec1 <- phylo_signal1$PACA
-PCA_PaCA_spec2 <- phylo_signal2$PACA
+PCA_res_PaCA_tree1 <- phylo_signal_res_tree1$PACA
+PCA_res_PaCA_tree2 <- phylo_signal_res_tree2$PACA
 
 #View results
-summary(PCA_PaCA_spec1)
-summary(PCA_PaCA_spec2)
+summary(PCA_res_PaCA_tree1)
+summary(PCA_res_PaCA_tree2)
 
 #Plot PaCa
-plot(PCA_PaCA_spec1, phylo = TRUE, #add phylogeny
-     main = "PaCa", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
-plot(PCA_PaCA_spec2, phylo = TRUE, #add phylogeny
-     main = "PaCa", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2)
+plot(PCA_res_PaCA_tree1, phylo = TRUE, #add phylogeny
+     main = "PaCa tree1", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+plot(PCA_res_PaCA_tree2, phylo = TRUE, #add phylogeny
+     main = "PaCa tree2", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2)
 
 ##phyloPCA
 #Phylogeny is used to calculate principal components of variation - GLS method
-PCA_phylo_spec1 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age2, GLS = TRUE)
-PCA_phylo_spec2 <- gm.prcomp(minkeAllometry_residuals, phy = spec_trees$age4, GLS = TRUE)
+PCA_res_phylo_tree1 <- gm.prcomp(allometry_residuals, phy = trees_specimens$age2, GLS = TRUE)
+PCA_res_phylo_tree2 <- gm.prcomp(allometry_residuals, phy = trees_specimens$age4, GLS = TRUE)
 
 #View results
-summary(PCA_phylo_spec1)
-summary(PCA_phylo_spec2)
+summary(PCA_res_phylo_tree1)
+summary(PCA_res_phylo_tree2)
 
 #Plot PCA
-plot(PCA_phylo_spec1, phylo = TRUE, #add phylogeny
-     main = "phyloPCA", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
-plot(PCA_phylo_spec2, phylo = TRUE, #add phylogeny
-     main = "phyloPCA", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
-
+plot(PCA_res_phylo_tree1, phylo = TRUE, #add phylogeny
+     main = "phyloPCA tree1", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
+plot(PCA_res_phylo_tree2, phylo = TRUE, #add phylogeny
+     main = "phyloPCA tree2", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2) 
 
 ##Make better PCA plot using ggplot - phyloPCA
 #Tree 1 as example
 #Save pc scores as object
-pcscores_phylo <- PCA_phylo_spec1[["x"]]
+pcscores_res_phylo_tree1 <- PCA_res_phylo_tree1[["x"]]
 
 #Read PC scores as tibble
-pcscores_phylo  <- as_tibble(pcscores_phylo)
-glimpse(pcscores_phylo )
+pcscores_res_phylo_tree1  <- as_tibble(pcscores_res_phylo_tree1)
+glimpse(pcscores_res_phylo_tree1)
 #Add labels and other attributes to tibble as columns
-pcscores_phylo  <- pcscores_phylo  %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
-glimpse(pcscores_phylo)
+pcscores_res_phylo_tree1  <- pcscores_res_phylo_tree1  %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
+glimpse(pcscores_res_phylo_tree1)
 
-##Order tibble by avariable e.g. age
+##Order tibble by variable e.g. age
 #Make factor for variable
-pcscores_phylo$age <- factor(pcscores_phylo$age, levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+pcscores_res_phylo_tree1$age <- factor(pcscores_res_phylo_tree1$age, 
+                                       levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
 #Order
-pcscores_phylo <- pcscores_phylo[order(pcscores_phylo$age),]
-glimpse(pcscores_phylo)
+pcscores_res_phylo_tree1 <- pcscores_res_phylo_tree1[order(pcscores_res_phylo_tree1$age),]
+glimpse(pcscores_res_phylo_tree1)
 
 #Use package ggphylomorpho to create a first phylomorphospace plot
-PCA_phylo_plot <- ggphylomorpho(tree = spec_trees$age2, tipinfo = pcscores_phylo, 
+PCA_res_phylo_tree1_plot <- ggphylomorpho(tree = trees_specimens$age2, tipinfo = pcscores_res_phylo_tree1, 
                                 xvar = Comp1, yvar = Comp2, 
                                 factorvar = age, labelvar = individuals, tree.alpha = 0.7)
-PCA_phylo_plot
+PCA_res_phylo_tree1_plot 
 
 #Using the package gginnards, remove the GeomPoint (points on tips) and GeomTextRepel (labels) so you just have the tree network
-PCA_phylo_plot <- PCA_phylo_plot %>%
-  delete_layers("GeomPoint") %>%
-  delete_layers("GeomTextRepel")
+PCA_res_phylo_tree1_plot  <- PCA_res_phylo_tree1_plot  %>%
+  delete_layers("GeomPoint") %>%   delete_layers("GeomTextRepel")
 
 #Create convex hulls - polygons that include all specimens that belong to a group
-hull_age <- pcscores_phylo %>%
+hulls_tree1 <- pcscores_res_phylo_tree1 %>%
   group_by(age) %>%
   slice(chull(Comp1, Comp2)) %>%
-  rename(x = Comp1) %>%
-  rename(y = Comp2)
-glimpse(hull_age)
-
-pcscores_phylo %>%
-  group_by(age)%>%
-slice(chull(Comp1, Comp2)) 
-
+  rename(x = Comp1, y = Comp2)
+glimpse(hulls_tree1)
 
 #Nice plot with phylogeny + convex hulls
-PCA_phylo_plot + 
-  geom_point(data = pcscores_phylo, aes(x = Comp1, y = Comp2, colour = age), size = 3)+ #add shape =  to aes to change shapes based on groups
-  #Add convex hulls
-  geom_polygon(data = hull_age, aes(x = x, y = y, fill = age), alpha = .5, show.legend = FALSE)+ #alpha = transparency of colour
+PCA_res_phylo_tree1_plot  + 
+  geom_point(data = pcscores_res_phylo_tree1, aes(x = Comp1, y = Comp2, colour = age), size = 3)+ #add "shape =" to aes to change shapes based on groups
+#Add convex hulls
+  geom_polygon(data = hulls_tree1, aes(x = x, y = y, fill = age), alpha = .5, show.legend = FALSE)+ #alpha = transparency of colour
 #Add labels  
-  geom_text_repel(data = pcscores_phylo, aes(x = Comp1, y = Comp2, label = individuals, size = 3.5), show.legend = FALSE)+
+  geom_text_repel(data = pcscores_res_phylo_tree1, aes(x = Comp1, y = Comp2, label = individuals, size = 3.5), show.legend = FALSE)+
 #Colour points and convex hulls
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), #to be ordered as they appear in tibble
-                      values = c("blue4", "cyan2","deepskyblue1","dodgerblue3"))+            #legend and color adjustments
-  scale_fill_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"),
-                    values = c("blue4", "cyan2","deepskyblue1","dodgerblue3"))+
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), #to be ordered as they appear in tibble
+                      values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+            #legend and color adjustments
+  scale_fill_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"),
+                    values = c("cyan2","deepskyblue1","dodgerblue3","blue4"))+
   theme_bw()+
-  ggtitle("phylo PCA by age")+
+  ggtitle("phylo PCA by age - tree1")+
   theme(legend.title = element_text(face="bold"), #Legend titles in bold
         legend.justification = "top")+ #Legend position
   xlab("PC 1 (41.92%)")+ #copy this from standard PCA plot
   ylab("PC 2 (27.47%)")+
   theme(plot.title = element_text(face = "bold", hjust = 0.5))  #title font and position
 
+##Extra code ggplot
 #Code to remove dots from legend
   guides(fill = guide_legend(override.aes = list(shape = NA)))+  #remove annoying dots in the colour legend
 #Code to decide which polygons are sued for each group if shape = present
@@ -1282,8 +1394,8 @@ ggplot(minkeAllometry_plot_age, aes(x = logCS, y = RegScores, label = individual
   geom_smooth(data = conf_intervals, aes(ymin = lwr, ymax = upr), stat = 'identity',          #confidence intervals and reg line, before points
               colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+      #put col and other graphics OUTSIDE of aes()!!!
   geom_point(size = 3)+       #points after, so they are on top
-  scale_colour_manual(name = "Growth stage", labels = c("Adult", "Early Fetus", "Late Fetus", "Neonate"), 
-                      values = c("blue4","cyan2","deepskyblue1","dodgerblue3"))+           
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), 
+                        values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+          
   theme_classic(base_size = 12)+
   ylab("Regression Score")+
   ggtitle ("Shape vs logCS by age")+
