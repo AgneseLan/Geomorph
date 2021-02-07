@@ -67,6 +67,19 @@ mean_shape <- gpa$consensus
 #Coordinates of all specimens after GPA alignment
 coords <- gpa$coords 
 
+#Plot all specimens with mean to check that all landmarks are ok
+plotAllSpecimens(coords, mean = TRUE, label = TRUE, plot.param = list(pt.cex = 0.5, mean.cex = 5, mean.bg = "black"))
+#Save screenshot of 3D viewer
+rgl.snapshot(filename = "Output/X.png") 
+
+#Check for outliers, they would be displayed in red
+plotOutliers(coords)
+
+#Plot outliers shape against mean to check which landmarks ar the problem - use their number in the dataset OR save as object plotOutliers
+plotRefToTarget(mean_shape,coords[,,4], method="TPS", mag = 1.5)
+plotRefToTarget(mean_shape,coords[,,4], method="vector", mag = 1.5)
+
+
 #PREPARE WARP MESH AND LINKS  ----
 
 #Find specimen closer to mean, useful to create warp mesh
@@ -248,7 +261,7 @@ ggplot(pcscores_all_size, aes(x = size, y = Comp2, label = individuals, colour =
   geom_text_repel(colour = "black", size = 3.5)
 
 
-#ALLOMETRY CORRECTION AND CAC PLOT----
+#ALLOMETRY CORRECTION ----
 ##Evaluate allometry and get the allometry-free shapes using LogCS, use this for analyses
 
 #Regression shape on logCS size
@@ -270,8 +283,7 @@ mean_shape_residuals <- mshape(allometry_residuals)
 #Diagnostic plots to check if model is appropriate - similar to ANOVA tables
 init <- par(no.readonly=TRUE) #store initial plot parameters to restore later
 par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
-plot(allometry,type = "diagnostics",
-                   cex = 1.2, font.main = 2)
+plot(allometry,type = "diagnostics", cex = 1.2, font.main = 2)
 par(init)                     #restore initial plot parameters (1 plot showing at a time)
 
 #Regression score of shape vs logCS - regression method with "RegScore" plotting
@@ -372,7 +384,9 @@ allometry_plot_PC <- plot(allometry,type = "PC",
 text(x = allometry_plot_PC$plot.args$x, y = allometry_plot_PC$plot.args$y, labels = specimens,
      pos = 3, offset = 0.5, cex = 0.75) 
 
+#ALLOMETRY CAC PLOT ----
 ##Specific plotAllometry functions - "CAC" and "size.shape" PCA (unclear what is the purpose of size-shape PCA, will not use)
+
 #CAC plot - for simple allometry is the same as RegScore plot and two-block PLS plot of shape and size
 allometry_plot_CAC <- plotAllometry(allometry, size = logCsize, logsz = FALSE, method = "CAC", 
                       main = "CAC plot", pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)   #improve graphics
@@ -397,7 +411,6 @@ allometry_plot_CAC_tibble$age <- factor(allometry_plot_CAC_tibble$age,
 #Order
 allometry_plot_CAC_tibble <- allometry_plot_CAC_tibble[order(allometry_plot_CAC_tibble$age),]
 glimpse(allometry_plot_CAC_tibble)
-
 
 ##Two plots: CAC vs logCsize (A) and RSC1 vs CAC (B)
 #Plot A
@@ -449,7 +462,6 @@ ggplot(allometry_plot_CAC_tibble, aes(x = logCS, y = CAC, label = individuals, c
   geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
                force_pull = 3, point.padding = 1) 
 
-
 #Plot B
 
 #Nice plot with specimens colored by age - no labels
@@ -486,7 +498,7 @@ text(x = block1_pls_logCS, y = block2_pls_shape, labels = specimens,
 
 ##Make better PLS plot with ggplot
 #Create data frame object that ggplot can read - use data from plot object you want to improve
-shape_logCS_pls_plot_tibble <- data.frame(blocKs_tree1 = block1_pls_logCS, block2 = block2_pls_shape)
+shape_logCS_pls_plot_tibble <- data.frame(block1 = block1_pls_logCS, block2 = block2_pls_shape)
 shape_logCS_pls_plot_tibble
 
 #Convert data frame to tibble
@@ -496,8 +508,16 @@ glimpse(shape_logCS_pls_plot_tibble)
 shape_logCS_pls_plot_tibble <- shape_logCS_pls_plot_tibble %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(shape_logCS_pls_plot_tibble)
 
+#Order tibble by variable e.g. age for plot legend
+#Make factor for variable
+shape_logCS_pls_plot_tibble$age <- factor(shape_logCS_pls_plot_tibble$age, 
+                                levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+shape_logCS_pls_plot_tibble <- shape_logCS_pls_plot_tibble[order(shape_logCS_pls_plot_tibble$age),]
+glimpse(shape_logCS_pls_plot_tibble)
+
 #Nice plot with specimens colored by age AND regression line with confidence intervals
-ggplot(shape_logCS_pls_plot_tibble, aes(x = blocKs_tree1, y = block2, label = individuals, colour = age))+
+ggplot(shape_logCS_pls_plot_tibble, aes(x = block1, y = block2, label = individuals, colour = age))+
 #confidence intervals and reg line, before points  
   geom_smooth(method='lm',     #use standard function, values too small    
               colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+  
@@ -508,7 +528,7 @@ ggplot(shape_logCS_pls_plot_tibble, aes(x = blocKs_tree1, y = block2, label = in
   theme_classic(base_size = 12)+
   xlab("PLS1 Block 1: logCS")+
   ylab("PLS1 Block 2: Shape")+
-  ggtitle ("PLS1 plot: Block 1 (logCS) vs Block 2 (Shape)")+
+  ggtitle ("PLS logCS vs Shape - p-avlue = 0.008**")+
   theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))
 
 
@@ -584,7 +604,7 @@ ggplot(pcscores_res, aes(x = Comp1, y = Comp2, label = individuals, colour = age
 #Create dataframe to operate more easily - use allometry residuals
 allometry_df <- geomorph.data.frame(allometry_residuals, gp = factor_age) 
 
-#Conduct ANOVA to test differences between groups
+#Conduct ANOVA to test if there is significant shape variatiojn among groups - are shapes in each group different from the otehr groups?
 group_anova <- procD.lm(allometry_residuals ~ gp, iter=999, data = allometry_df) 
 
 #Results and significance of ANOVA
@@ -592,12 +612,12 @@ summary(group_anova)
 
 #Diagnostic plots to check if model is appropriate - similar to ANOVA tables - DO also if not significant, don't do other plots
 par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
-plot(group_anova,type = "diagnostics", cex = 1.2, font.main = 2)
+plot(group_anova, type = "diagnostics", cex = 1.2, font.main = 2)
 par(init)                     #restore initial plot parameters (1 plot showing at a time)
 
 
 ##Morphological disparity 
-#Calculate Procrustes variances and distances between groups after allometric correction
+#Calculate Procrustes variances and distances between groups after allometric correction - how different are each group shapes compared to other group shapes?
 group_disparity <- morphol.disparity(allometry_residuals ~ 1, groups = ~ factor_age, iter = 999) #do NOT use dataframe, issues with groups
 
 #Results and significance
@@ -878,7 +898,7 @@ ggplot(pcscores_res_sym, aes(x = Comp1, y = Comp2, label = individuals, colour =
   theme(plot.title = element_text(face = "bold", hjust = 0.5))  #title font and position
 
 
-#MODULARITY TEST AND INTEGRATION TEST ----
+#MODULARITY TEST ----
 
 #Set all landmarks in one module
 modules <- rep('a',16) 
@@ -953,9 +973,10 @@ modularity_plot + #use plot obtained before after color and binwidth ok
   theme_minimal()+
   xlab("CR coefficient")+
   ylab("Frequency")+
-  ggtitle("Modularity analysis - p-value <0.05***")+  #copy data from standard plot
+  ggtitle("Modularity analysis - p-value = 0.003**")+  #copy data from standard plot
   theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13))
 
+#INTEGRATION TEST ----
 ##Perform integration test between the 2 modules (two-block PLS within configuration) 
 #How much are the two or more modules integrated with each other?
 #Best done on allometric residuals - NOT ON SYMMETRY data, not a biological significant hypothesis and little difference
@@ -1084,6 +1105,14 @@ glimpse(integration_pls_plot_tibble)
 integration_pls_plot_tibble <- integration_pls_plot_tibble %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(integration_pls_plot_tibble)
 
+#Order tibble by variable e.g. age for plot legend
+#Make factor for variable
+integration_pls_plot_tibble$age <- factor(integration_pls_plot_tibble$age, 
+                                levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+integration_pls_plot_tibble <- integration_pls_plot_tibble[order(integration_pls_plot_tibble$age),]
+glimpse(integration_pls_plot_tibble)
+
 #Nice plot with specimens colored by age AND regression line with confidence intervals
 ggplot(integration_pls_plot_tibble, aes(x = block1_pls_integr, y = block2_pls_integr, label = individuals, colour = age))+
   #confidence intervals and reg line, before points  
@@ -1095,12 +1124,12 @@ ggplot(integration_pls_plot_tibble, aes(x = block1_pls_integr, y = block2_pls_in
                         values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+          
   theme_classic(base_size = 12)+
   xlab("PLS1 Block 1: rostrum")+
-  ylab("PLS1 Block 1: braincase")+
-  ggtitle ("PLS1 plot: Block 1 (rostrum) vs Block 2 (braincase)")+
+  ylab("PLS1 Block 2: braincase")+
+  ggtitle ("Integration test skull modules - p-value = 0.001***")+  #copy from test summary
   theme(plot.title = element_text(size = 13, face = "bold", hjust = 0.5), axis.title = element_text(size = 11))
 
 
-#PHYLOGENTIC/AGE ANALYSIS ----
+#PHYLOMORPHOSPACE PLOT ----
 
 #Import trees in Nexus format - branch lengths needed!!
 trees1 <- "Data/trees_age_2.nex"   #trees with groups
@@ -1151,6 +1180,8 @@ filename <- tempfile(fileext = ".html")
 htmlwidgets::saveWidget(rglwidget(), filename)
 browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
 
+#PHYGENETIC SIGNAL TEST AND PaCa PLOT ----
+
 ##Test for phylogenetic signal in shape residuals
 phylo_signal_res_tree1 <- physignal(allometry_residuals,phy = trees_specimens$age2, iter = 999)
 phylo_signal_res_tree2 <- physignal(allometry_residuals,phy = trees_specimens$age4, iter = 999)
@@ -1180,7 +1211,7 @@ glimpse(phylo_signal_res_tree1_plot_tibble)
 
 #Make simple histogram plot as object to obtain counts per bin with given bin width
 phylo_signal_res_tree1_plot <- ggplot(phylo_signal_res_tree1_plot_tibble, aes(Ks_tree1))+
-  geom_histogram(bins = 30, fill = "azure2", colour = "azure4")     #see if bins value appropriate and choose colors
+  geom_histogram(bins = 30, fill = "gray91", colour = "gray78")     #see if bins value appropriate and choose colors
 phylo_signal_res_tree1_plot
 
 #Create data frame with plot variables
@@ -1218,7 +1249,7 @@ phylo_signal_res_tree1_plot + #use plot obtained before after color and binwidth
   theme_minimal()+
   xlab("Phylogenetic Signal K")+
   ylab("Frequency")+
-  ggtitle("Phylogentic Signal test tree1 - p-value=0.743")+  #copy data from standard plot
+  ggtitle("Phylogentic Signal test tree1 - p-value = 0.743")+  #copy data from standard plot
   theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13))
 
 #Phylogenetic signal test for shapes produces PaCa
@@ -1237,8 +1268,10 @@ plot(PCA_res_PaCA_tree1, phylo = TRUE, #add phylogeny
 plot(PCA_res_PaCA_tree2, phylo = TRUE, #add phylogeny
      main = "PaCa tree2", pch = 21, col = "deeppink", bg = "deeppink", cex = 1, font.main = 2)
 
-##phyloPCA
+#phyloPCA PLOT ----
 #Phylogeny is used to calculate principal components of variation - GLS method
+
+#PCA analysis with phylogeny
 PCA_res_phylo_tree1 <- gm.prcomp(allometry_residuals, phy = trees_specimens$age2, GLS = TRUE)
 PCA_res_phylo_tree2 <- gm.prcomp(allometry_residuals, phy = trees_specimens$age4, GLS = TRUE)
 
@@ -1302,7 +1335,7 @@ PCA_res_phylo_tree1_plot  +
   scale_fill_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"),
                     values = c("cyan2","deepskyblue1","dodgerblue3","blue4"))+
   theme_bw()+
-  ggtitle("phylo PCA by age - tree1")+
+  ggtitle("phyloPCA tree1")+
   theme(legend.title = element_text(face="bold"), #Legend titles in bold
         legend.justification = "top")+ #Legend position
   xlab("PC 1 (41.92%)")+ #copy this from standard PCA plot
@@ -1318,112 +1351,132 @@ scale_shape_manual(values=c(17, 18, 15))
 
 #ALLOMETRY ANALYSIS BY GROUP AND GROUP MEANS ----
 
-#Regression of shapes uncorrected on logCS corrected by group (e.g. species, age)
-minkeAllometry_log_age <- procD.lm(minke_coords ~ logCsize * factor_age, iter=999, print.progress = TRUE) 
-View(minkeAllometry_log_age)
+#Regression of shapes on logCS considering groups as additional factor (e.g. species, age) - test if grouping is driving allometry
+allometry_group <- procD.lm(coords ~ logCsize * factor_age, iter=999, print.progress = TRUE) 
+View(allometry_group)
 
 #Main results of ANOVA analysis of allometry with logCS
-summary(minkeAllometry_log_age) 
+summary(allometry_group) 
 
 ##Plot shape vs logCS to visualize allometry
 #Diagnostic plots to check if model is appropriate - similar to ANOVA tables
 init <- par(no.readonly=TRUE) #store initial plot parameters to restore later
 par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
-allometryplot_diagnostics_age <- plot(minkeAllometry_log_age,type = "diagnostics",
-                                   cex = 1.2, font.main = 2)
+plot(allometry_group,type = "diagnostics", cex = 1.2, font.main = 2)
 par(init)                     #restore initial plot parameters (1 plot showing at a time)
 
 #Regression score of shape vs logCS - regression method with regression score plotting
-allometryplot_regscore_age <- plot(minkeAllometry_log_age, type = "regression", predictor = logCsize, reg.type = "RegScore",
-                                main = "Shape vs logCS by age",xlab = "logCS", pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)   #improve graphics
-text(x = logCsize, y = allometryplot_regscore_age$RegScore, labels = specimens,
+allometry_group_plot_regscore <- plot(allometry_group, type = "regression", predictor = logCsize, reg.type = "RegScore",
+                                main = "Shape vs logCS by group",xlab = "logCS", 
+                                pch = 21, col = "chartreuse4", bg = "chartreuse4", cex = 1.2, font.main = 2)   #improve graphics
+text(x = logCsize, y = allometry_group_plot_regscore$RegScore, labels = specimens,
      pos = 3, offset = 0.5, cex = 0.75)    #improve appearance of labels
 
 ##Add regression line with confidence intervals to plot
 #Create object to use for linear model
-reg_scores_age <- allometryplot_regscore_age[["RegScore"]] 
+allometry_group_regscores <- allometry_group_plot_regscore[["RegScore"]] 
 
 #Linear model for line
-reg_line_age <- (lm(reg_scores~logCsize))
-summary(reg_line_age)
+allometry_group_regline <- (lm(allometry_group_regscores ~ logCsize))
+
+#Check p-value for plot
+summary(allometry_group_regline)
 
 #Draw line on plot
-abline(reg_line_age, col = "darkseagreen3", 
+abline(allometry_group_regline, col = "darkseagreen3", 
        lty = 2, lwd = 2)     #line type (e.g. dashed) and width
 
 #Add confidence intervals
 #Create data for confidence intervals
-x_vals <- seq(min(logCsize), max(logCsize), length = 12)   #use min and max of x values (logCS) as limits and use number of specimens as length of sequence
-newX <- expand.grid(logCsize = x_vals)                     #warp x_vals on values of x axis (logCS)
-newY <- predict(reg_line_age, newdata = data.frame(x = newX), interval="confidence",
-                level = 0.95)                                      #predict the y values based on the x sequence
+allometry_group_xvals <- seq(min(logCsize), max(logCsize), length = 12)   #use min and max of x values (logCS) as limits and use number of specimens as length of sequence
+allometry_group_newX <- expand.grid(logCsize = allometry_group_xvals)     #warp x_vals on values of x axis (logCS)
+allometry_group_newY <- predict(allometry_group_regline, newdata = data.frame(x = allometry_group_newX), 
+                                interval="confidence", level = 0.95)      #predict the y values based on the x sequence
 
 #Draw confidence intervals lines on plot
-matlines(newX, newY[,2:3],                                 #first column of newY not useful, it is the fit, 2 and 3 are the min and max values
+matlines(allometry_group_newX, allometry_group_newY[,2:3],  #first column of newY not useful, it is the fit, 2 and 3 are the min and max values
          col = "darkseagreen3", lty=1)                     #line graphics
 
 ##Make better allometry plot with ggplot
 #Create data frame object that ggplot can read - use data from plot object you want to improve
-minkeAllometry_plot_age <- data.frame(logCS = allometryplot_regscore_age[["plot.args"]][["x"]], RegScores = allometryplot_regscore_age[["plot.args"]][["y"]])
-minkeAllometry_plot_age
+allometry_group_plot_tibble <- data.frame(logCS = allometry_group_plot_regscore[["plot.args"]][["x"]], 
+                                          RegScores = allometry_group_plot_regscore[["plot.args"]][["y"]])
+allometry_group_plot_tibble
 
 #Convert data frame to tibble
-minkeAllometry_plot_age <- as_tibble(minkeAllometry_plot_age)
-glimpse(minkeAllometry_plot_age)
+allometry_group_plot_tibble <- as_tibble(allometry_group_plot_tibble)
+glimpse(allometry_group_plot_tibble)
 #Add labels and other attributes to tibble as columns
-minkeAllometry_plot_age <- minkeAllometry_plot_age %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
-glimpse(minkeAllometry_plot_age)
+allometry_group_plot_tibble <- allometry_group_plot_tibble %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
+glimpse(allometry_group_plot_tibble)
+
+#Order tibble by variable e.g. age for plot legend
+#Make factor for variable
+allometry_group_plot_tibble$age <- factor(allometry_group_plot_tibble$age, 
+                                levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+allometry_group_plot_tibble <- allometry_group_plot_tibble[order(allometry_group_plot_tibble$age),]
+glimpse(allometry_group_plot_tibble)
 
 ##Add regression line with confidence intervals
 #Make data frame of data for confidence intervals
-conf_intervals <- data.frame(newX, newY)
-conf_intervals 
+allometry_group_conf_intervals <- data.frame(allometry_group_newX, allometry_group_newY)
+allometry_group_conf_intervals 
 #Rename columns to match main plot tibble varibales for x and y
-conf_intervals <- rename(conf_intervals, logCS = logCsize, RegScores = fit)
-conf_intervals 
+allometry_group_conf_intervals <- rename(allometry_group_conf_intervals, logCS = logCsize, RegScores = fit)
+allometry_group_conf_intervals 
 
 #Convert data frame to tibble
-conf_intervals <- as_tibble(conf_intervals)
-glimpse(conf_intervals)
+allometry_group_conf_intervals <- as_tibble(allometry_group_conf_intervals)
+glimpse(allometry_group_conf_intervals)
 #Add labels and other attributes to tibble as columns to match main plot tibble
-conf_intervals <- conf_intervals %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
-glimpse(conf_intervals)
+allometry_group_conf_intervals <- allometry_group_conf_intervals %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
+glimpse(allometry_group_conf_intervals)
+
+#Order tibble by variable e.g. age for plot legend
+#Make factor for variable
+allometry_group_conf_intervals$age <- factor(allometry_group_conf_intervals$age, 
+                                          levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
+#Order
+allometry_group_conf_intervals <- allometry_group_conf_intervals[order(allometry_group_conf_intervals$age),]
+glimpse(allometry_group_conf_intervals)
 
 #Nice plot with specimens colored by age AND regression line with confidence intervals
-ggplot(minkeAllometry_plot_age, aes(x = logCS, y = RegScores, label = individuals, colour = age))+
-  geom_smooth(data = conf_intervals, aes(ymin = lwr, ymax = upr), stat = 'identity',          #confidence intervals and reg line, before points
+ggplot(allometry_group_plot_tibble, aes(x = logCS, y = RegScores, label = individuals, colour = age))+
+  geom_smooth(data = allometry_group_conf_intervals, aes(ymin = lwr, ymax = upr), stat = 'identity',  #confidence intervals and reg line, before points
               colour = "darkblue", fill = 'gainsboro', linetype = "dashed", size = 0.8)+      #put col and other graphics OUTSIDE of aes()!!!
   geom_point(size = 3)+       #points after, so they are on top
   scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), 
                         values = c("cyan2","deepskyblue1","dodgerblue3", "blue4"))+          
   theme_classic(base_size = 12)+
   ylab("Regression Score")+
-  ggtitle ("Shape vs logCS by age")+
+  ggtitle ("Shape vs logCS by group - p-value = 0.765")+  #copy p-value from linear model of conf_intervals, gives idea if groups are significant factor or not
   theme(plot.title = element_text(face = "bold", hjust = 0.5))+
   geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
                   force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance) 
 
-##Group means - can be useful if I have multiple specimens of 1 species to plot
+##Group means - can be useful if I have multiple specimens of 1 group to plot as a single point
 #Create mean shape for each group based on classifiers
-age_means <- aggregate(two.d.array(minke_coords) ~ factor_age, FUN = mean)
+shape_group_means <- aggregate(two.d.array(coords) ~ factor_age, FUN = mean)
+shape_group_means
 
 #Set row names that match tree labels
-rownames(age_means) <- c("adult","earlyFetus","lateFetus","neonate") 
-age_means
+rownames(shape_group_means) <- c("adult","earlyFetus","lateFetus","neonate") #check that the factors are in the same order as the rows currently
+shape_group_means
 
 #Transform in matrix and exclude columns that do not contain coordinates
-age_means <- as.matrix(age_means[,-1]) 
+shape_group_means <- as.matrix(shape_group_means[,-1]) #eliminate first column numerically
 #Transform in 3D array
-age_means <- arrayspecs(age_means,16,3) 
+shape_group_means <- arrayspecs(shape_group_means,16,3) 
 
 #Mean logCS size based on groups
-logCsize_age_means <- aggregate(logCsize ~ factor_age, FUN = mean) 
+size_group_means <- aggregate(logCsize ~ factor_age, FUN = mean) 
 
 #Set row names that match tree labels
-rownames(logCsize_age_means) <- c("adult","earlyFetus","lateFetus","neonate") 
+rownames(size_group_means) <- c("adult","earlyFetus","lateFetus","neonate") 
 
 #Eliminate first column with names of classifiers
-logCsize_age_means <- select(logCsize_age_means,-"factor_age") 
+size_group_means <- select(size_group_means,-"factor_age")#eliminate first column by selecting the rest and writing column name
 
 #Make numeric
-logCsize_age_means <- as.matrix(logCsize_age_means) 
+size_group_means <- as.matrix(size_group_means) 
