@@ -15,7 +15,7 @@ pcscores_all_size$age <- factor(pcscores_all_size$age,
 pcscores_all_size <- pcscores_all_size[order(pcscores_all_size$age),]
 glimpse(pcscores_all_size)
 
-#PCA/regression plot with geom_points and scale colour ----
+#PCA/regression plot with geom_points and scale color ----
 ggplot(pcscores_all, aes(x = Comp1, y = Comp2, label = individuals, colour = age))+
   geom_point(size = 3)+
   geom_text_repel(colour = "black", size = 3.5)+
@@ -104,7 +104,7 @@ ggplot(allometry_plot_tibble, aes(x = logCS, y = RegScores, label = individuals,
                   force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance) 
 
 
-#Regression plot with geom_point and geom_smooth with line and confidence intervals using standard function strandard  ----
+#Regression plot with geom_point and geom_smooth with line and confidence intervals using standard function  ----
 
 #Plot
 ggplot(allometry_plot_CAC_tibble, aes(x = CAC, y = RSC1, colour = age))+
@@ -184,7 +184,7 @@ ggplot(group_trajectory_pcscores, aes(x = PC1, y = PC2, colour = age))+
   ggtitle("Trajectories by age")+
   theme(plot.title = element_text(face = "bold", hjust = 0.5))
 
-##Histogram plot using geom_histogram with 2 arrows for data and mean values ----
+#Histogram plot using geom_histogram with 2 arrows for data and mean values ----
 
 #Save CR of data as object
 CRdata <- modularity_test[["CR"]]
