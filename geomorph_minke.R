@@ -1204,7 +1204,7 @@ Ks_tree1 <- phylo_signal_res_tree1[["random.K"]]
 #Calculate mean of Ks for arrow
 mean_K_tree1 <- mean(Ks_tree1)
 
-#Create tibble with phylogentic signal analysis values
+#Create tibble with phylogenetic signal analysis values
 phylo_signal_res_tree1_plot_tibble <- data.frame(Ks_tree1)
 phylo_signal_res_tree1_plot_tibble <- as_tibble(phylo_signal_res_tree1_plot_tibble)
 glimpse(phylo_signal_res_tree1_plot_tibble)
@@ -1223,7 +1223,7 @@ phylo_signal_res_tree1_plot_data <- phylo_signal_res_tree1_plot_data[,1:5]
 phylo_signal_res_tree1_plot_data <- as_tibble(phylo_signal_res_tree1_plot_data)
 glimpse(phylo_signal_res_tree1_plot_data)
 
-#Filter rows to select row with count for CR data and mean CR 
+#Filter rows to select row with count for K data and mean K
 Kdata_tree1_filter <- phylo_signal_res_tree1_plot_data %>% filter(xmin <= Kdata_tree1, xmax >= Kdata_tree1)
 mean_K_tree1_filter <- phylo_signal_res_tree1_plot_data %>% filter(xmin <= mean_K_tree1, xmax >= mean_K_tree1)
 
@@ -1233,23 +1233,25 @@ phylo_signal_res_tree1_arrow_plot <- data.frame(x_data = Kdata_tree1_filter$x, y
 phylo_signal_res_tree1_arrow_plot <- as_tibble(phylo_signal_res_tree1_arrow_plot)
 
 #Check that values of x are similar to the original data and mean values, if not change bins number or binwidth in original plot (add bins)
+Kdata_tree1
+mean_K_tree1
 glimpse(phylo_signal_res_tree1_arrow_plot)
 
 #Nice plot  
 phylo_signal_res_tree1_plot + #use plot obtained before after color and binwidth ok
-  #add arrow for CR data
-  geom_segment(data = phylo_signal_res_tree1_arrow_plot, aes(x = x_data, xend = x_data, y = y_data, yend = y_data + 20, colour = "firebrick4"), size = 1,
+  #add arrow for K data
+  geom_segment(data = phylo_signal_res_tree1_arrow_plot, aes(x = x_data, xend = x_data, y = y_data, yend = y_data + 20, colour = "slateblue4"), size = 1,
                arrow = arrow(angle = 30, length = unit(0.02, "npc"), ends = "first", type = "closed"), linejoin = 'mitre')+
-  #add arrow for mean CR 
-  geom_segment(data = phylo_signal_res_tree1_arrow_plot, aes(x = x_mean, xend = x_mean, y = y_mean, yend = y_mean + 20, colour = "black"), size = 1,
+  #add arrow for mean K
+  geom_segment(data = phylo_signal_res_tree1_arrow_plot, aes(x = x_mean, xend = x_mean, y = y_mean, yend = y_mean + 20, colour = "skyblue3"), size = 1,
                arrow = arrow(angle = 30, length = unit(0.02, "npc"), ends = "first", type = "closed"), linejoin = 'mitre')+
 #legend and color adjustments  
-  scale_colour_manual(name = NULL, labels = c("mean K (0.348)", "Observed K (0.325)"),    #copy data from objects
-                      values = c("black", "firebrick4"))+        
+  scale_colour_manual(name = NULL, labels = c("mean K (0.350)", "Observed K (0.325)"),    #copy data from objects
+                      values = c("slateblue4","skyblue3"))+        
   theme_minimal()+
   xlab("Phylogenetic Signal K")+
   ylab("Frequency")+
-  ggtitle("Phylogentic Signal test tree1 - p-value = 0.743")+  #copy data from standard plot
+  ggtitle("Phylogentic Signal test tree1 - p-value = 0.745")+  #copy data from standard plot
   theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13))
 
 #Phylogenetic signal test for shapes produces PaCa
@@ -1297,14 +1299,6 @@ glimpse(pcscores_res_phylo_tree1)
 pcscores_res_phylo_tree1  <- pcscores_res_phylo_tree1  %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(pcscores_res_phylo_tree1)
 
-##Order tibble by variable e.g. age
-#Make factor for variable
-pcscores_res_phylo_tree1$age <- factor(pcscores_res_phylo_tree1$age, 
-                                       levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
-#Order
-pcscores_res_phylo_tree1 <- pcscores_res_phylo_tree1[order(pcscores_res_phylo_tree1$age),]
-glimpse(pcscores_res_phylo_tree1)
-
 #Use package ggphylomorpho to create a first phylomorphospace plot
 PCA_res_phylo_tree1_plot <- ggphylomorpho(tree = trees_specimens$age2, tipinfo = pcscores_res_phylo_tree1, 
                                 xvar = Comp1, yvar = Comp2, 
@@ -1333,7 +1327,7 @@ PCA_res_phylo_tree1_plot  +
   scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"), #to be ordered as they appear in tibble
                       values = project_palette)+            #legend and color adjustments
   scale_fill_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus", "Neonate", "Adult"),
-                    values = c("cyan2","deepskyblue1","dodgerblue3","blue4"))+
+                    values =  project_palette)+
   theme_bw()+
   ggtitle("phyloPCA tree1")+
   theme(legend.title = element_text(face="bold"), #Legend titles in bold
@@ -1342,12 +1336,6 @@ PCA_res_phylo_tree1_plot  +
   ylab("PC 2 (27.47%)")+
   theme(plot.title = element_text(face = "bold", hjust = 0.5))  #title font and position
 
-##Extra code ggplot
-#Code to remove dots from legend
-  guides(fill = guide_legend(override.aes = list(shape = NA)))+  #remove annoying dots in the colour legend
-#Code to decide which polygons are sued for each group if shape = present
-scale_shape_manual(values=c(17, 18, 15)) 
-  
 
 #ALLOMETRY ANALYSIS BY GROUP AND GROUP MEANS ----
 
@@ -1360,7 +1348,6 @@ summary(allometry_group)
 
 ##Plot shape vs logCS to visualize allometry
 #Diagnostic plots to check if model is appropriate - similar to ANOVA tables
-init <- par(no.readonly=TRUE) #store initial plot parameters to restore later
 par(mfrow = c(2, 2))          #arrange all the 4 plots next to each other
 plot(allometry_group,type = "diagnostics", cex = 1.2, font.main = 2)
 par(init)                     #restore initial plot parameters (1 plot showing at a time)
@@ -1410,14 +1397,6 @@ glimpse(allometry_group_plot_tibble)
 allometry_group_plot_tibble <- allometry_group_plot_tibble %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(allometry_group_plot_tibble)
 
-#Order tibble by variable e.g. age for plot legend
-#Make factor for variable
-allometry_group_plot_tibble$age <- factor(allometry_group_plot_tibble$age, 
-                                levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
-#Order
-allometry_group_plot_tibble <- allometry_group_plot_tibble[order(allometry_group_plot_tibble$age),]
-glimpse(allometry_group_plot_tibble)
-
 ##Add regression line with confidence intervals
 #Make data frame of data for confidence intervals
 allometry_group_conf_intervals <- data.frame(allometry_group_newX, allometry_group_newY)
@@ -1433,14 +1412,6 @@ glimpse(allometry_group_conf_intervals)
 allometry_group_conf_intervals <- allometry_group_conf_intervals %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 glimpse(allometry_group_conf_intervals)
 
-#Order tibble by variable e.g. age for plot legend
-#Make factor for variable
-allometry_group_conf_intervals$age <- factor(allometry_group_conf_intervals$age, 
-                                          levels = c("earlyFetus", "lateFetus", "neonate", "adult")) #use the original factor to copy the list of levels
-#Order
-allometry_group_conf_intervals <- allometry_group_conf_intervals[order(allometry_group_conf_intervals$age),]
-glimpse(allometry_group_conf_intervals)
-
 #Nice plot with specimens colored by age AND regression line with confidence intervals
 ggplot(allometry_group_plot_tibble, aes(x = logCS, y = RegScores, label = individuals, colour = age))+
   geom_smooth(data = allometry_group_conf_intervals, aes(ymin = lwr, ymax = upr), stat = 'identity',  #confidence intervals and reg line, before points
@@ -1450,7 +1421,7 @@ ggplot(allometry_group_plot_tibble, aes(x = logCS, y = RegScores, label = indivi
                         values = project_palette)+          
   theme_classic(base_size = 12)+
   ylab("Regression Score")+
-  ggtitle ("Shape vs logCS by group - p-value = 0.765")+  #copy p-value from linear model of conf_intervals, gives idea if groups are significant factor or not
+  ggtitle ("Shape vs logCS by group - p-value = 0.629")+  #copy p-value from linear model of conf_intervals, gives idea if groups are significant factor or not
   theme(plot.title = element_text(face = "bold", hjust = 0.5))+
   geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
                   force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance) 
@@ -1461,7 +1432,7 @@ shape_group_means <- aggregate(two.d.array(coords) ~ factor_age, FUN = mean)
 shape_group_means
 
 #Set row names that match tree labels
-rownames(shape_group_means) <- c("adult","earlyFetus","lateFetus","neonate") #check that the factors are in the same order as the rows currently
+rownames(shape_group_means) <- shape_group_means[,1] #check that the factors are in the same order as the rows currently
 shape_group_means
 
 #Transform in matrix and exclude columns that do not contain coordinates
@@ -1473,7 +1444,7 @@ shape_group_means <- arrayspecs(shape_group_means,16,3)
 size_group_means <- aggregate(logCsize ~ factor_age, FUN = mean) 
 
 #Set row names that match tree labels
-rownames(size_group_means) <- c("adult","earlyFetus","lateFetus","neonate") 
+rownames(size_group_means) <- size_group_means[,1] 
 
 #Eliminate first column with names of classifiers
 size_group_means <- select(size_group_means,-"factor_age")#eliminate first column by selecting the rest and writing column name
