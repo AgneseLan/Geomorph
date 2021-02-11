@@ -5,6 +5,7 @@ library(ggfortify)
 library(RColorBrewer)
 library(borealis)
 library(ggthemes)
+library(gridExtra)
 
 #Make palette with ggthemes - color or shapes
 View(ggthemes_data)
@@ -20,6 +21,9 @@ mypalette <- as.matrix(mypalette)
 project_palette <- c(mypalette[3,], mypalette[9,], mypalette[15,], mypalette[20,])
 image(1:4, 1, as.matrix(1:4), col = project_palette, xlab = "Project palette", ylab = "", yaxt = "n")
 
+#Create shape palette
+shapes <- c(21, 22, 24) #circle, square and triangle, fillable and with border
+
 #Convert data frame to tibble
 pcscores_all_size <- as_tibble(pcscores_all_size)
 glimpse(pcscores_all_size)
@@ -27,10 +31,6 @@ glimpse(pcscores_all_size)
 pcscores_all_size <- pcscores_all_size %>% mutate(individuals = classifiers$specimenID, age = classifiers$age)
 #Check tibble is ordered as initial data
 glimpse(pcscores_all_size)
-
-#Multiple plots together specifying how many per row or col (ggfortify)
-
-new('ggmultiplot', plots = list(p1, p2), ncol = 1, nrow = 1)  #save the ggplot plots as objects to be listed
 
 #PCA/regression plot with geom_points and scale color ----
 ggplot(pcscores_all, aes(x = Comp1, y = Comp2, label = individuals, colour = age))+
@@ -277,3 +277,60 @@ modularity_plot + #use plot obtained before after color and binwidth ok
 
 
 
+
+#Combine mutiple plots in 1 - 2 methods ----
+
+#Multiple plots together specifying how many per row or col (ggfortify) - not great, need shared legend
+new('ggmultiplot', plots = list(p1, p2), ncol = 1, nrow = 1)  #save the ggplot plots as objects to be listed
+
+#Plot together with shared legend
+#Create plot to extract legend
+plot_legend <- ggplot(proj_Neoph_tibble, aes(x = axis1, y = axis2, colour = specimens))+
+  geom_point(size = 3)+
+  scale_colour_manual(name = "Specimens", labels = c("1-Delphinapterus_554", "2-Delphinapterus_555", "3-Delphinapterus_556",
+                                                     "4-Megaptera_MVZ", "5-Megaptera_SDNHM", "6-Neophocoena_1889", "7-Physeter_4.8"), #to be ordered as they appear in tibble
+                      values = scale)+ 
+  guides(colour = guide_legend(override.aes = list(shape = NA)))+
+  theme_bw()+
+  theme(legend.title.align = 0.5, legend.title = element_text(size = 9), 
+        legend.direction = "vertical", legend.position = "right", legend.text = element_text(size = 8))
+
+plot_legend
+
+#Create user-defined function, which extracts legends from ggplots
+extract_legend <- function(my_ggp) {
+  step1 <- ggplot_gtable(ggplot_build(my_ggp))
+  step2 <- which(sapply(step1$grobs, function(x) x$name) == "guide-box")
+  step3 <- step1$grobs[[step2]]
+  return(step3)
+}
+
+shared_legend <- extract_legend(plot_legend)
+
+grid.arrange(arrangeGrob(plot_Meg, plot_Neoph, plot_noNeoph, ncol = 3),
+             shared_legend, nrow = 2, heights = c(10, 7))
+#Plot with hulls ----
+#Create hulls
+hulls <- proj_all_tibble_hulls %>%
+  group_by(number) %>%
+  slice(chull(axis1, axis2)) %>%
+  rename(x = axis1, y = axis2)
+View(hulls)
+
+#Plot with hulls
+ggplot(proj_all_tibble, aes(x = axis1, y = axis2, label = number, colour = specimens,  fill = specimens))+
+  geom_point(size = 3)+
+  geom_polygon(data = hulls, aes(x = x, y = y), alpha = .5, show.legend = FALSE)+
+  theme_bw()+   #theme_light nd theme_minimal also ok
+  xlab("I (35.2%-26.3%)")+ #copy this from values tibble
+  ylab("II (27.9%-23.3%)")+
+  ggtitle("GPSA all tests")+
+  guides(alpha = guide_legend(override.aes = list(shape = NA)))+
+  geom_text_repel(colour = "black", size = 5, max.overlaps = 20, show.legend = FALSE)+
+  theme(legend.title.align = 0.5, legend.direction = "horizontal", legend.position = "bottom",
+        plot.title = element_text(face = "bold", hjust = 0.5, size = 13))  #title font and position
+###Extra code ggplot ----
+#Code to remove dots from legend
+guides(fill = guide_legend(override.aes = list(shape = NA)))+  #remove annoying dots in the colour legend
+  #Code to decide which polygons are sued for each group if shape = present
+  scale_shape_manual(values=c(17, 18, 15)) 
