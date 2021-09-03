@@ -6,6 +6,12 @@ library(RColorBrewer)
 library(borealis)
 library(ggthemes)
 library(gridExtra)
+library(rphylopic)
+library(png)
+library(gginnards)
+library(ggfortify)
+
+#apropos("x") lists objects with matching part of name
 
 #Make palette with ggthemes - color or shapes
 View(ggthemes_data)
@@ -22,7 +28,11 @@ project_palette <- c(mypalette[3,], mypalette[9,], mypalette[15,], mypalette[20,
 image(1:4, 1, as.matrix(1:4), col = project_palette, xlab = "Project palette", ylab = "", yaxt = "n")
 
 #Create shape palette
-shapes <- c(21, 22, 24) #circle, square and triangle, fillable and with border
+shapes <- c(21, 22, 24) #circle, square and triangle, fillable and with border ?pch for all codes
+
+#Images for plots
+myst <- readPNG("Data/myst.png")
+odont <- readPNG("Data/odont.png")
 
 #Convert data frame to tibble
 pcscores_all_size <- as_tibble(pcscores_all_size)
@@ -66,6 +76,31 @@ PCA_all_ggplot +
   ggtitle("PCA all data")+
   theme(plot.title = element_text(face = "bold", hjust = 0.5)) 
 
+#3D PCA plot with %LogCsize on z-axis ----
+#Create column with % log size
+pcscores_all <- pcscores_all %>% mutate(size_100 = (size*100/max(size)))
+glimpse(pcscores_all)
+
+#Make sure grouping variables are factors
+pcscores_all$genus <- as.factor(pcscores_all$genus)
+pcscores_all$category <- as.factor(pcscores_all$category)
+
+#Plot by genus
+scatter3d(x = pcscores_all$Comp1, y = pcscores_all$Comp2, z = pcscores_all$size_100, groups = pcscores_all$genus,
+          grid = FALSE, surface = FALSE, ellipsoid = TRUE, surface.col = mypalette_taxa,
+          xlab = "PC1 (49.60%)", ylab = "PC2 (26.62%)", zlab = "% max logCS", axis.scales = F,
+          axis.col = c("black", "black", "red"), sphere.size = 0.6)
+
+##3D windows save
+{#Save screenshot of 3D window, useful for lateral and dorsal views - use screen snip if it fails
+  rgl.snapshot(filename = "Output/PCA_all_size100_3D_genus.png") 
+  #Save 3D window as html file - 3D widget
+  scene <- scene3d()
+  widget <- rglwidget()
+  filename <- tempfile(fileext = ".html")
+  htmlwidgets::saveWidget(rglwidget(), filename)
+  browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
+}
 
 #Regression plot with geom_points and geom_abline with intercept and slope from external model ----
 
@@ -135,6 +170,21 @@ ggplot(allometry_plot_tibble, aes(x = logCS, y = RegScores, label = individuals,
   theme(plot.title = element_text(face = "bold", hjust = 0.5))+
   geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
                   force_pull = 3, point.padding = 1)     #position of tables relative to point (proximity and distance) 
+
+#Plot with different lines for each group
+ggplot(bulla_meas, aes(y = bullaL, x = BZW, fill = group, color = group)) +
+  geom_smooth(data = bullaL_conf_intervals, aes(ymin = lwr, ymax = upr, fill = group, colour = group, linetype = group), stat = 'identity',      #confidence intervals and reg line, before points
+              size = 0.8, alpha = 0.2, show.legend = F)+      #put col and other graphics OUTSIDE of aes()!!!
+  geom_point(size = 3)+       #points after, so they are on top
+  scale_color_manual(name = "Groups", labels  = c("Mysticeti", "Odontoceti"), values = mypalette_earbones[1:2], aesthetics = c("color","fill"))+         
+  theme_classic(base_size = 12)+
+  xlab("BZW (mm)")+
+  ylab("Bulla length (mm)")+
+  ggtitle ("BZW vs Bulla length by group - p-value < 0.001***")+  #copy from model summary
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 12), #title format
+        legend.position = "none", legend.direction = "vertical", #eliminate legend
+        axis.title.x = element_text(vjust = -1), #move axes labels far way from numbers on axes, can also add formatting as for title
+        axis.title.y = element_text(vjust = 2))
 
 
 #Regression plot with geom_point and geom_smooth with line and confidence intervals using standard function  ----
@@ -275,13 +325,159 @@ modularity_plot + #use plot obtained before after color and binwidth ok
   ggtitle("Modularity analysis - p-value <0.05***")+  #copy data from standard plot
   theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13))
 
+#Bar plots - stacked and dodged ----
+#Save variances as object
+PV_size_genus_category <- data.frame(PV = disparity_size_genus_category[["Procrustes.var"]])
 
+#Look at order of genera and stages to create vectors
+PV_size_genus_category
 
+#Add labels and other attributes to tibble as columns
+PV_size_genus_category <- PV_size_genus_category %>% 
+  mutate(category = PV_categories, genus = PV_genera)
+glimpse(PV_size_genus_category)
 
-#Combine mutiple plots in 1 - 2 methods ----
+#Nice histogram plot
+PV_size_genus_category_ggplot <- ggplot(PV_size_genus_category, aes(category, PV, colour = genus, fill = genus)) +
+  geom_col(position = position_dodge2(padding = 0.2))+
+  scale_y_continuous(expand = c(0,0))+
+  scale_x_discrete(labels=c("1-early" = "Early Fetus", "2-late/new" = "Late Fetus/Neonate", 
+                            "3-immature" = "Juvenile", "4-adult" = "Adult"))+
+  scale_color_manual(name = "Genus", labels = c("Balaenoptera", "Delphinapterus", "Phocoena", "Stenella"),
+                     values = mypalette_taxa, aesthetics = c("color","fill"))+ 
+  theme_classic(base_size = 12)+
+  xlab("Growth stage")+
+  ylab("PV (Procrustes variances)")+
+  ggtitle ("Disparity by genus and category size-corrected")+ 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13), 
+        axis.text.x = element_text(size = 10), axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+        axis.title.x = element_text(vjust = -0.5, size = 12),  axis.title.y = element_text(hjust = 0.5, size = 12),
+        legend.text = element_text(size = 12), legend.title = element_text(size = 13))
+PV_size_genus_category_ggplot
+
+#Nice histogram plot by genus
+PV_size_category_genus_ggplot <- ggplot(PV_size_genus_category, aes(genus, PV, colour = category, fill = category)) +
+  geom_col(position="fill")+
+  scale_y_continuous(expand = c(0,0))+
+  scale_x_discrete(labels=c("Balaenoptera" = "Bal", "Delphinapterus" = "Delph", 
+                            "Phocoena" = "Phoc", "Stenella" = "Sten"))+
+  scale_colour_manual(name = "Growth stage", labels = c("Early Fetus", "Late Fetus/Neonate", "Juvenile", "Adult"), #to be genused as they appear in tibble
+                      values = mypalette_category, aesthetics = c("colour", "fill"))+
+  theme_classic(base_size = 12)+
+  xlab("Genus")+
+  ggtitle ("Disparity by category and genus size-corrected")+ 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13), 
+        axis.text.x = element_text(size = 10), 
+        axis.title.x = element_text(vjust = -0.5, size = 12),  axis.title.y = element_blank(),
+        legend.text = element_text(size = 12), legend.title = element_text(size = 13))
+PV_size_category_genus_ggplot
+
+#Heatmaps plots for significant p-values ----
+#Functions
+#Get lower triangle of the correlation matrix
+get_lower_tri<-function(x){
+  x[upper.tri(x)] <- NA
+  return(x)
+}
+#Get upper triangle of the correlation matrix
+get_upper_tri <- function(x){
+  x[lower.tri(x)]<- NA
+  return(x)
+}
+#Reorder table
+reorder_corr_table <- function(x){
+  # Use correlation between variables as distance
+  dd <- as.dist((1-x)/2)
+  hc <- hclust(dd)
+  x <-x[hc$order, hc$order]
+}
+
+#Make shorted names for genera and stages
+genera_list_short <-  str_sub(genera_list, 1, 4)
+
+categories_list_short <- str_replace_all(categories_list, 
+                                         c("1-early" = "1" ,   "2-late/new" = "2" , "3-immature" = "3", "4-adult" = "4"))
+
+#Create palette for heatmap plot
+mypalette_seq <- brewer.pal(9,"Oranges")
+image(1:9,1, as.matrix(1:9), col = mypalette_seq,xlab="Oranges (sequential)",
+      ylab = "", yaxt = "n")
+
+#Save p-values as object
+disp_corr <- disparity_genus_category[["PV.dist"]]
+disp_pvals <- disparity_genus_category[["PV.dist.Pval"]]
+
+#Save row and col names as variables to change string - colnames = rownames for both
+vars <- rownames(disp_corr)
+
+#Replace string names to make them shorter
+vars <- str_replace_all(vars, "\\.", "_")
+
+#Loop replacements categories
+for (u in 1:length(categories_list)){
+  vars <- str_replace_all(vars, categories_list[u], categories_list_short[u])
+}
+
+#Loop replacements genera
+for (t in 1:length(genera_list)){
+  vars <- str_replace_all(vars, genera_list[t], genera_list_short[t])
+}
+
+#Check it worked
+vars
+
+#Set correct row and col names for both
+rownames(disp_corr) <- vars
+rownames(disp_pvals) <- vars
+colnames(disp_corr) <- vars
+colnames(disp_pvals) <- vars
+
+#Reorder tables
+disp_corr <- reorder_corr_table(disp_corr)
+disp_pvals <- reorder_corr_table(disp_pvals)
+
+#Get upper triangles only - half matrix, eliminates redundant info
+disp_corr_upper_tri <- get_upper_tri(disp_corr)
+disp_pvals_upper_tri <- get_upper_tri(disp_pvals)
+
+#Melt to make table in the format needed for heatmap
+disp_corr_melt <- melt(disp_corr_upper_tri, value.name = "corr", na.rm = TRUE)
+disp_pvals_melt <- melt(disp_pvals_upper_tri, value.name = "p", na.rm = TRUE)
+
+#Add column to main table
+disp_pvals_melt$corr <- disp_corr_melt$corr
+
+#Create columns where only significant values are shown
+disp_pvals_melt <- disp_pvals_melt %>% mutate(sig_p = ifelse(p < .05, T, F),
+                                              p_if_sig = ifelse(sig_p, p, NA),
+                                              corr_if_sig = ifelse(sig_p, corr, NA))
+glimpse(disp_pvals_melt)
+
+#Nice heatmap plot
+disparity_genus_category_heatmap_ggplot <- ggplot(data = disp_pvals_melt, aes(Var2, Var1, fill = p_if_sig))+
+  geom_tile(colour = "gray80")+
+  scale_fill_gradient2(low = mypalette_seq[9], high = mypalette_seq[2], mid = mypalette_seq[5], #negative correlations are in blue color and positive correlations in red. 
+                       midpoint = 0.03, limit = c(0.001, 0.049), space = "Lab", #scale is from min to max p-values
+                       na.value =  mypalette_seq[1], name = "P-values < 0.05") + 
+  theme_minimal()+ 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1))+
+  coord_fixed()+
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text.x =  element_text(size = 10),
+        axis.text.y =  element_text(size = 10, vjust = -0.2, margin = NULL), panel.grid.major = element_blank(),
+        legend.justification = c(1, 0), legend.position = c(0.4, 0.7),  legend.direction = "horizontal",
+        legend.title = element_text(size = 13), legend.text = element_text(size = 11))+
+  guides(fill = guide_colorbar(barwidth = 10, barheight = 1.5,
+                               title.position = "top", title.hjust = 0.5))
+disparity_genus_category_heatmap_ggplot
+
+#Combine multiple plots in 1 - 2 methods ----
 
 #Multiple plots together specifying how many per row or col (ggfortify) - not great, need shared legend
 new('ggmultiplot', plots = list(p1, p2), ncol = 1, nrow = 1)  #save the ggplot plots as objects to be listed
+
+#Multiple plots together with gridExtra
+grid.arrange(plot1, plot2, plot3, ncol = 2, nrow= 2)
 
 #Plot together with shared legend
 #Create plot to extract legend
@@ -329,8 +525,29 @@ ggplot(proj_all_tibble, aes(x = axis1, y = axis2, label = number, colour = speci
   geom_text_repel(colour = "black", size = 5, max.overlaps = 20, show.legend = FALSE)+
   theme(legend.title.align = 0.5, legend.direction = "horizontal", legend.position = "bottom",
         plot.title = element_text(face = "bold", hjust = 0.5, size = 13))  #title font and position
+
 ###Extra code ggplot ----
+# Remove all legends from plot
+theme(legend.position = "none")                      
+
 #Code to remove dots from legend
 guides(fill = guide_legend(override.aes = list(shape = NA)))+  #remove annoying dots in the colour legend
-  #Code to decide which polygons are sued for each group if shape = present
-  scale_shape_manual(values=c(17, 18, 15)) 
+
+#Remove legend for a scale_ using guide
+guides(colour = guide_legend(label = F, title = NULL, override.aes = list(shape = NA)))
+  
+#Code to decide which polygons are sued for each group if shape = present
+scale_shape_manual(values=c(17, 18, 15))+
+
+#Code to adjust plot and axes titles
+theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 12), #title format
+        legend.position = "none", legend.direction = "vertical", #eliminate legend
+        axis.title.x = element_text(vjust = -1), #move axes labels far way from numbers on axes, can also add formatting as for title
+        axis.title.y = element_text(vjust = 2))+
+
+#Move layers up or down 
+move_layers(allometry_BZW_bullaL_gp_plot, "GeomPoint", position = "top")
+
+#Add silhouettes to plot
+plot +  add_phylopic(myst, alpha = 1, x = 100, y = 60, ysize = 30, color = mypalette_earbones[1])+ #previously imported PNGs, x and y position, ysize is size of image
+  add_phylopic(odont, alpha = 1, x = 300, y = 20, ysize = 25, color = mypalette_earbones[2])

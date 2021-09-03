@@ -17,6 +17,7 @@ library(borealis)
 library(ggthemes)
 library(ggpubr)
 library(ggplotify)
+library(Morpho)
 
 #DATA IMPORT AND PREP ----
 
@@ -151,6 +152,10 @@ links <- links[-24,]
 #see if links are ok in 3D space
 plot(minke_gpa,links=links) 
 
+##Save warped mesh as ply (Morpho)
+mesh_export <- plotRefToTarget(mean_shape,coords[,,1], mesh = ref_mesh, method="surface", mag = 1.5, label = T)
+
+mesh2ply(mesh_export, filename = "mesh_A")
 
 #PCA COMPLETE DATASET ----
 
@@ -318,6 +323,11 @@ allometry <- procD.lm(coords ~ logCsize, iter=999, print.progress = TRUE)
 
 #Main results of ANOVA analysis of allometry with logCS
 summary(allometry) 
+
+#Save results of significant regression to file
+sink("Output/allometry_shape_size.txt")
+print(summary(allometry))
+sink() 
 
 #Create residuals array to then save as coordinates for analyses
 allometry_array <- arrayspecs(allometry$residuals,p = dim(coords)[1], k = dim(coords)[2]) 
@@ -622,7 +632,7 @@ PCA_res_ggplot +
 #Create dataframe to operate more easily - use allometry residuals
 allometry_df <- geomorph.data.frame(allometry_residuals, gp = factor_age) 
 
-#Conduct ANOVA to test if there is significant shape variatiojn among groups - are shapes in each group different from the otehr groups?
+#Conduct ANOVA to test if there is significant shape variation among groups - are shapes in each group different from the other groups?
 group_anova <- procD.lm(allometry_residuals ~ gp, iter=999, data = allometry_df) 
 
 #Results and significance of ANOVA
@@ -842,7 +852,7 @@ ggplot(allometry_sym_plot_tibble, aes(x = logCS, y = RegScores, label = individu
   geom_text_repel(colour = "black", size = 3.5,          #label last so that they are on top of fill
                   force_pull = 3, point.padding = 1) 
 
-#PCA SYMMETRY ALLOEMTRY RESIDUALS ----
+#PCA SYMMETRY ALLOMETRY RESIDUALS ----
 
 ##New PCA plot with data corrected for allometry and symmetry
 PCA_residuals_sym <- gm.prcomp(allometry_residuals_sym) 
@@ -1180,7 +1190,7 @@ filename <- tempfile(fileext = ".html")
 htmlwidgets::saveWidget(rglwidget(), filename)
 browseURL(filename)    #from browser save screenshots as PNG (right click on image-save image) and save HTML (right click on white space-save as->WebPage HTML, only)
 
-#PHYGENETIC SIGNAL TEST AND PaCa PLOT ----
+#PHYLOGENETIC SIGNAL TEST AND PaCa PLOT ----
 
 ##Test for phylogenetic signal in shape residuals
 phylo_signal_res_tree1 <- physignal(allometry_residuals,phy = trees_specimens$age2, iter = 999)
